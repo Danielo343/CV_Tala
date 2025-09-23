@@ -1,0 +1,11 @@
+﻿# Node
+node_modules/
+# Env
+*.env
+Estadias/**/node_modules/
+Estadias/**/.env
+# Backup .git
+*.git_removed_*
+
+# VSCode
+.vscode/
