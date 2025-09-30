@@ -1,11 +1,38 @@
 ﻿# Node
 node_modules/
-# Env
-*.env
-Estadias/**/node_modules/
-Estadias/**/.env
-# Backup .git
-*.git_removed_*
+**/node_modules/
 
-# VSCode
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Env files
+.env
+.env.local
+.env.*.local
+Estadias/**/.env
+Estadias/**/.env.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
 .vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backups
+*.git_removed_*
+*.git.backup
