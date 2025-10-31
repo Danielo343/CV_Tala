@@ -130,55 +130,112 @@ app.get('/api/catalogos', async (req, res) => {
   }
 });
 
-// Endpoint para crear una nueva activación (Versión simplificada para empezar)
+// Endpoint para crear una nueva activación (VERSIÓN FINAL, AHORA SÍ)
 app.post('/api/activaciones', async (req, res) => {
-  // Obtenemos todos los datos del formulario, incluyendo el nuevo arreglo
+  // 1. Leemos TODOS los campos del formulario, incluyendo los nuevos
   const {
-    fecha_activacion, hora_activacion, origen_reporte,
-    num_reporte_externo, requirio_traslado, hospital_destino,
-    paciente_nombre, paciente_edad, paciente_sexo,
-    id_tipo_activacion, id_unidad_asignada, id_causa_clinica,
-    id_causas_traumaticas // ¡Aquí viene nuestro nuevo arreglo!
+    fecha_activacion,
+    hora_activacion,
+    origen_reporte,
+    num_reporte_externo,
+    requirio_traslado = false, // El switch (true/false)
+    hospital_destino,
+    paciente_nombre,
+    paciente_edad = null,
+    paciente_sexo,
+    causa_clinica_especifica,
+    ct_especifico,
+    tipo_activacion_otro, // <-- ¡NUEVO CAMPO!
+    id_tipo_activacion,
+    id_unidad_asignada = null,
+    id_causa_clinica = null,
+    id_causas_traumaticas = [],
+    id_agente_causante_general = null,
+    id_estado_traslado = null, // El dropdown ("No amerita", etc.)
+    evaluacion = {},
+    lesiones = []
   } = req.body;
 
-  // Pedimos una conexión a la base de datos para manejar la transacción
+  // 2. Lógica de traslado (como la pediste)
+  // Si SÍ se trasladó (true), guardamos el hospital y ponemos el estado en null.
+  // Si NO se trasladó (false), guardamos el estado y ponemos el hospital en null.
+  const final_hospital_destino = requirio_traslado ? hospital_destino : null;
+  const final_id_estado_traslado = !requirio_traslado ? id_estado_traslado : null;
+
   const client = await pool.connect();
 
   try {
-    // ---- Inicia la "caja de seguridad" ----
     await client.query('BEGIN');
 
-    // 1. Guardamos los datos principales en la tabla 'activaciones'
-    //    y le pedimos que nos devuelva el 'id' y el 'num_reporte_local' del nuevo registro.
+    // 3. Insertar en 'activaciones' (actualizado con los nuevos campos)
     const activacionQuery = `
       INSERT INTO activaciones (
         fecha_activacion, hora_activacion, origen_reporte, num_reporte_externo, 
         requirio_traslado, hospital_destino, paciente_nombre, paciente_edad, 
-        paciente_sexo, id_tipo_activacion, id_unidad_asignada, id_causa_clinica
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        paciente_sexo, causa_clinica_especifica, ct_especifico, id_tipo_activacion, 
+        id_unidad_asignada, id_causa_clinica, id_agente_causante_general, id_estado_traslado,
+        tipo_activacion_otro -- <-- ¡NUEVA COLUMNA!
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING id, num_reporte_local;
     `;
+    
+    // 4. Valores para el INSERT (actualizados)
     const activacionValues = [
-      fecha_activacion, hora_activacion, origen_reporte, num_reporte_externo,
-      requirio_traslado, hospital_destino, paciente_nombre, paciente_edad,
-      paciente_sexo, id_tipo_activacion, id_unidad_asignada, id_causa_clinica
+      fecha_activacion, hora_activacion,
+      origen_reporte || 'Local', num_reporte_externo,
+      requirio_traslado, final_hospital_destino, // <-- Lógica de traslado aplicada
+      paciente_nombre, paciente_edad,
+      paciente_sexo, causa_clinica_especifica, ct_especifico,
+      id_tipo_activacion, id_unidad_asignada, id_causa_clinica,
+      id_agente_causante_general, final_id_estado_traslado, // <-- Lógica de traslado aplicada
+      tipo_activacion_otro // <-- ¡NUEVO VALOR!
     ];
     
     const nuevaActivacionResult = await client.query(activacionQuery, activacionValues);
     const nuevaActivacion = nuevaActivacionResult.rows[0];
-    const nuevaActivacionId = nuevaActivacion.id; // ¡Este es el ID que necesitamos!
+    const nuevaActivacionId = nuevaActivacion.id;
 
-    // 2. Revisamos si el arreglo 'id_causas_traumaticas' tiene algo
+    // 5. Insertar causas traumáticas (si existen)
     if (id_causas_traumaticas && id_causas_traumaticas.length > 0) {
       const causaTraumaticaQuery = 'INSERT INTO activacion_causas_traumaticas (id_activacion, id_causa_traumatica_especifica) VALUES ($1, $2)';
-      
-      // Hacemos un bucle y guardamos una por una cada causa seleccionada
       for (const id_causa of id_causas_traumaticas) {
         await client.query(causaTraumaticaQuery, [nuevaActivacionId, id_causa]);
       }
     }
 
-    // ---- Si todo salió bien, cerramos la "caja de seguridad" y guardamos los cambios ----
+    // 6. Insertar evaluación clínica (si existe)
+    if (evaluacion && (evaluacion.id_estado_pupilas || evaluacion.id_estado_piel)) {
+      const evaluacionQuery = `
+        INSERT INTO evaluacion_clinica (id_activacion, anisocoria_lado, id_estado_pupilas, id_estado_piel)
+        VALUES ($1, $2, $3, $4);
+      `;
+      await client.query(evaluacionQuery, [
+        nuevaActivacionId,
+        evaluacion.anisocoria_lado || null,
+        evaluacion.id_estado_pupilas || null,
+        evaluacion.id_estado_piel || null
+      ]);
+    }
+
+    // 7. Insertar lesiones (¡AHORA SÍ SE GUARDAN!)
+    if (lesiones && lesiones.length > 0) {
+      const lesionQuery = `
+        INSERT INTO lesiones_activacion (id_activacion, descripcion_lesion, id_tipo_lesion, id_ubicacion_lesion)
+        VALUES ($1, $2, $3, $4);
+      `;
+      for (const lesion of lesiones) {
+        // Solo guardar si la lesión tiene al menos un dato
+        if (lesion.id_tipo_lesion || lesion.id_ubicacion_lesion || (lesion.descripcion_lesion && lesion.descripcion_lesion.trim() !== '')) {
+            await client.query(lesionQuery, [
+              nuevaActivacionId,
+              lesion.descripcion_lesion,
+              lesion.id_tipo_lesion,
+              lesion.id_ubicacion_lesion
+            ]);
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({ 
@@ -187,38 +244,35 @@ app.post('/api/activaciones', async (req, res) => {
     });
 
   } catch (err) {
-    // ---- Si algo falló, deshacemos todos los cambios ----
     await client.query('ROLLBACK');
-    console.error('Error en la transacción:', err);
-    res.status(500).json({ error: 'Error al guardar el registro. No se guardó ningún dato.' });
+    console.error('Error detallado en la transacción:', err);
+    res.status(500).json({ error: 'Error al guardar el registro. Revise la consola del servidor para más detalles.' });
   } finally {
-    // Liberamos la conexión para que otros la puedan usar
     client.release();
   }
 });
 
 app.get('/api/activaciones', async (req, res) => {
+  const { scope } = req.query; // Leemos el parámetro "scope" de la URL
+
   try {
-    const query = `
+    let query = `
       SELECT 
-        a.id,
-        a.num_reporte_local,
-        a.fecha_activacion,
-        a.paciente_nombre,
-        ta.nombre AS tipo_activacion,
-        cc.nombre AS causa_clinica
-      FROM 
-        activaciones AS a
-      LEFT JOIN 
-        tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
-      LEFT JOIN 
-        causa_clinica AS cc ON a.id_causa_clinica = cc.id
-      ORDER BY 
-        a.fecha_activacion DESC, a.hora_activacion DESC;
+        a.id, a.num_reporte_local, a.fecha_activacion, a.paciente_nombre,
+        ta.nombre AS tipo_activacion, cc.nombre AS causa_clinica
+      FROM activaciones AS a
+      LEFT JOIN tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
+      LEFT JOIN causa_clinica AS cc ON a.id_causa_clinica = cc.id
     `;
+    
+    // Si la URL pide los de hoy, añadimos el filtro WHERE
+    if (scope === 'today') {
+      query += ' WHERE a.fecha_activacion = CURRENT_DATE ';
+    }
+    
+    query += ' ORDER BY a.fecha_activacion DESC, a.hora_activacion DESC;';
 
     const result = await pool.query(query);
-
     res.json(result.rows);
 
   } catch (err) {

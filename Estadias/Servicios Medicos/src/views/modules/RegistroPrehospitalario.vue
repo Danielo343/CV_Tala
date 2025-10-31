@@ -3,10 +3,10 @@
     <div class="page-header">
       <h1 class="page-title">{{ pageTitle }}</h1>
       <div class="page-actions">
-        <button @click="toggleFormVisibility" class="btn btn-primary">
-          <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
-          <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
-        </button>
+         <button @click="toggleFormVisibility" class="btn btn-primary">
+           <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
+           <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
+         </button>
       </div>
     </div>
 
@@ -21,35 +21,37 @@
           {{ mensaje }}
         </div>
 
-        <!-- NUEVO DISEÑO DEL FORMULARIO -->
-        <form @submit.prevent="registrarActivacion" class="form-container">
-          <!-- Sección 1: Datos de Activación -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-file-invoice"></i>
-              <h3>Datos de Activación</h3>
+        <form @submit.prevent="registrarActivacion" class="form-container-stacked">
+
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Datos de Activación</h3>
             </div>
-            <div class="section-content">
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Fecha de Activación *</label>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Fecha de Activación  (Hora del evento)</label>
                   <input type="date" v-model="formulario.fecha_activacion" class="form-control" required>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Hora de Activación *</label>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Hora de Activación  (Hora del evento)</label>
                   <input type="time" v-model="formulario.hora_activacion" class="form-control" required>
                 </div>
               </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Tipo de Activación *</label>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Tipo de Activación </label>
                   <select v-model="formulario.id_tipo_activacion" class="form-select" required>
                     <option :value="null" disabled>Seleccione una opción</option>
                     <option v-for="tipo in catalogos.tipos_activacion" :key="tipo.id" :value="tipo.id">{{ tipo.nombre }}</option>
                   </select>
                 </div>
-                <div class="form-group">
+                
+                <div v-if="mostrarOtroTipoActivacion" class="col-md-6 mb-3">
+                  <label class="form-label">Especifique "Otro" Tipo Activación</label>
+                  <input type="text" v-model="formulario.tipo_activacion_otro" class="form-control" placeholder="Describa el tipo de activación">
+                </div>
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Unidad Asignada</label>
                   <select v-model="formulario.id_unidad_asignada" class="form-select">
                     <option :value="null">Seleccione una unidad</option>
@@ -57,62 +59,51 @@
                   </select>
                 </div>
               </div>
-              
-              <div v-if="mostrarOtroTipoActivacion" class="form-group full-width">
-                <label class="form-label">Especifique "Otro"</label>
-                <input type="text" v-model="formulario.causa_clinica_especifica" class="form-control" placeholder="Describa el tipo de activación">
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" v-model="tieneReporteExterno" id="checkReporteExterno">
+                <label class="form-check-label" for="checkReporteExterno">¿Tiene reporte externo? (C5, 911, etc.)</label>
               </div>
-              
-              <div class="toggle-group">
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" v-model="tieneReporteExterno" id="checkReporteExterno">
-                  <label class="form-check-label" for="checkReporteExterno">¿Tiene reporte externo? (C5, etc.)</label>
-                </div>
-              </div>
-              
-              <div v-if="tieneReporteExterno" class="form-row">
-                <div class="form-group">
+              <div v-if="tieneReporteExterno" class="row">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Origen Reporte Externo</label>
                   <select v-model="formulario.origen_reporte" class="form-select">
                     <option value="C5">C5</option>
                     <option value="R">9-1-1</option>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Número Reporte Externo</label>
-                  <input type="text" v-model="formulario.num_reporte_externo" class="form-control" placeholder="C5-12345">
+                  <input type="text" v-model="formulario.num_reporte_externo" class="form-control" placeholder="Folio C5 o 911">
                 </div>
               </div>
-              
-              <div class="form-row readonly-fields">
-                <div class="form-group">
-                  <label class="form-label">Fecha de Captura (Automática)</label>
+              <hr class="my-3">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label text-muted">Fecha de Captura (Automática)</label>
                   <input type="date" :value="currentDate" class="form-control" disabled>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Hora de Captura (Automática)</label>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label text-muted">Hora de Captura (Automática)</label>
                   <input type="time" :value="currentTime" class="form-control" disabled>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Sección 2: Causa del Servicio -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-stethoscope"></i>
-              <h3>Causa del Servicio</h3>
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-stethoscope me-2"></i>Causa del Servicio</h3>
             </div>
-            <div class="section-content">
-              <div class="form-row">
-                <div class="form-group">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Causa Clínica</label>
                   <select v-model="formulario.id_causa_clinica" class="form-select">
                     <option :value="null">Seleccione (si aplica)</option>
                     <option v-for="causa in catalogos.causa_clinica" :key="causa.id" :value="causa.id">{{ causa.nombre }}</option>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Agente Causal General</label>
                   <select v-model="formulario.id_agente_causante_general" class="form-select">
                     <option :value="null">Seleccione (si aplica)</option>
@@ -120,13 +111,12 @@
                   </select>
                 </div>
               </div>
-              
-              <div class="form-group full-width">
+              <div class="mb-3">
                 <label class="form-label">Descripción Causa Clínica</label>
                 <textarea v-model="formulario.causa_clinica_especifica" class="form-control" rows="2" placeholder="Detalles adicionales de la causa clínica..."></textarea>
               </div>
-              
-              <div class="form-group full-width">
+              <hr class="my-3">
+              <div class="mb-3">
                 <label class="form-label">Causas Traumáticas</label>
                 <div class="checkbox-grid">
                   <div v-for="causa in catalogos.causas_traumaticas" :key="causa.id" class="checkbox-item">
@@ -135,34 +125,30 @@
                   </div>
                 </div>
               </div>
-              
-              <div class="form-group full-width">
+              <div class="mb-3">
                 <label class="form-label">Descripción Causa Traumática</label>
                 <textarea v-model="formulario.ct_especifico" class="form-control" rows="2" placeholder="Detalles adicionales de la causa traumática..."></textarea>
               </div>
             </div>
           </div>
 
-          <!-- Sección 3: Datos del Paciente -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-user-injured"></i>
-              <h3>Datos del Paciente</h3>
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-user-injured me-2"></i>Datos del Paciente</h3>
             </div>
-            <div class="section-content">
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Nombre completo *</label>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Nombre completo </label>
                   <input type="text" v-model="formulario.paciente_nombre" class="form-control" placeholder="Ej: Juan Pérez" required>
                 </div>
-                <div class="form-group">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Edad</label>
                   <input type="number" v-model="formulario.paciente_edad" class="form-control" placeholder="Ej: 35" min="0" max="120">
                 </div>
               </div>
-              
-              <div class="form-row">
-                <div class="form-group">
+              <div class="row">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Sexo</label>
                   <select v-model="formulario.paciente_sexo" class="form-select">
                     <option value="">Seleccione</option>
@@ -170,37 +156,32 @@
                     <option value="F">Femenino</option>
                     <option value="O">No definido</option>
                   </select>
-                </div>
+                  </div>
               </div>
             </div>
           </div>
 
-          <!-- Sección 4: Evaluación Clínica -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-heart-pulse"></i>
-              <h3>Evaluación Clínica</h3>
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-heart-pulse me-2"></i>Evaluación Clínica</h3>
             </div>
-            <div class="section-content">
-              <div class="form-row">
-                <div class="form-group">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Estado de Pupilas</label>
                   <select v-model="formulario.evaluacion.id_estado_pupilas" class="form-select">
                     <option :value="null">Seleccione una opción</option>
                     <option v-for="e in catalogos.estados_pupilas" :key="e.id" :value="e.id">{{ e.nombre }}</option>
                   </select>
                 </div>
-                <div v-if="isAnisocoria" class="form-group">
+                <div v-if="isAnisocoria" class="col-md-6 mb-3">
                   <label class="form-label">Lado Anisocoria</label>
                   <select v-model="formulario.evaluacion.anisocoria_lado" class="form-select">
                     <option value="Der">Derecho</option>
                     <option value="Izq">Izquierdo</option>
                   </select>
                 </div>
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
+                <div class="col-md-6 mb-3">
                   <label class="form-label">Estado de la Piel</label>
                   <select v-model="formulario.evaluacion.id_estado_piel" class="form-select">
                     <option :value="null">Seleccione una opción</option>
@@ -211,13 +192,11 @@
             </div>
           </div>
 
-          <!-- Sección 5: Registro de Lesiones -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-band-aid"></i>
-              <h3>Registro de Lesiones</h3>
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-band-aid me-2"></i>Registro de Lesiones</h3>
             </div>
-            <div class="section-content">
+            <div class="card-body">
               <div v-if="formulario.lesiones.length === 0" class="empty-lesion">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>No se han registrado lesiones.</p>
@@ -227,19 +206,18 @@
                 <div class="lesion-header">
                   <h4>Lesión #{{ index + 1 }}</h4>
                   <button @click.prevent="eliminarLesion(index)" class="btn btn-sm btn-outline-danger">
-                    <i class="fas fa-trash"></i> Quitar
+                    <i class="fas fa-trash me-1"></i> Quitar
                   </button>
                 </div>
-                
-                <div class="form-row">
-                  <div class="form-group">
+                <div class="row">
+                  <div class="col-md-6 mb-3">
                     <label class="form-label">Tipo de Lesión</label>
                     <select v-model="lesion.id_tipo_lesion" class="form-select">
                       <option :value="null">Seleccione tipo</option>
                       <option v-for="t in catalogos.tipos_lesion" :key="t.id" :value="t.id">{{ t.nombre }}</option>
                     </select>
                   </div>
-                  <div class="form-group">
+                  <div class="col-md-6 mb-3">
                     <label class="form-label">Ubicación de la Lesión</label>
                     <select v-model="lesion.id_ubicacion_lesion" class="form-select">
                       <option :value="null">Seleccione ubicación</option>
@@ -247,52 +225,48 @@
                     </select>
                   </div>
                 </div>
-                
-                <div class="form-group full-width">
+                <div class="mb-3">
                   <label class="form-label">Descripción de la Lesión</label>
                   <textarea v-model="lesion.descripcion_lesion" class="form-control" rows="2" placeholder="Detalles específicos..."></textarea>
                 </div>
-              </div>
+                </div>
               
-              <div class="add-lesion-btn">
+              <div class="add-lesion-btn mt-3">
                 <button @click.prevent="agregarLesion" class="btn btn-outline-primary">
-                  <i class="fas fa-plus"></i> Agregar Lesión
+                  <i class="fas fa-plus me-2"></i> Agregar Lesión
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Sección 6: Traslado -->
-          <div class="form-section card-section">
-            <div class="section-header">
-              <i class="fas fa-ambulance"></i>
-              <h3>Traslado</h3>
+          <div class="card shadow-sm mb-4 form-section">
+            <div class="card-header section-header">
+              <h3 class="mb-0"><i class="fas fa-ambulance me-2"></i>Traslado</h3>
             </div>
-            <div class="section-content">
-              <div class="toggle-group">
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" v-model="formulario.requirio_traslado" id="checkTraslado">
-                  <label class="form-check-label" for="checkTraslado">¿Se trasladó?</label>
-                </div>
+            <div class="card-body">
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" v-model="formulario.requirio_traslado" id="checkTraslado">
+                <label class="form-check-label" for="checkTraslado">¿Se trasladó?</label>
+              </div>
+              <div v-if="formulario.requirio_traslado" class="row">
+                  <div class="col-md-12 mb-3">
+                      <label class="form-label">Hospital Destino </label>
+                      <input type="text" v-model="formulario.hospital_destino" class="form-control" placeholder="Nombre del hospital" required>
+                  </div>
               </div>
               
-              <div v-if="formulario.requirio_traslado" class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Estado del Traslado</label>
-                  <select v-model="formulario.id_estado_traslado" class="form-select">
-                    <option :value="null">Seleccione estado</option>
-                    <option v-for="op in catalogos.estados_traslado" :key="op.id" :value="op.id">{{ op.nombre }}</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Hospital Destino</label>
-                  <input type="text" v-model="formulario.hospital_destino" class="form-control" placeholder="Nombre del hospital">
-                </div>
+              <div v-else class="row">
+                  <div class="col-md-12 mb-3">
+                      <label class="form-label">Estado del Servicio </label>
+                      <select v-model="formulario.id_estado_traslado" class="form-select" required>
+                          <option :value="null" disabled>Seleccione estado del servicio</option>
+                          <option v-for="op in catalogos.estados_traslado" :key="op.id" :value="op.id">{{ op.nombre }}</option>
+                      </select>
+                  </div>
               </div>
-            </div>
+              </div>
           </div>
 
-          <!-- Botón de envío -->
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-lg">
               <i class="fas fa-save me-2"></i>
@@ -302,8 +276,7 @@
         </form>
       </div>
 
-      <!-- VISTA DE REGISTROS DEL DÍA (sin cambios) -->
-      <div v-else>
+      <div v-else class="p-3">
          <div v-if="cargando" class="text-center p-5">
            <div class="spinner-border text-primary" role="status">
              <span class="visually-hidden">Cargando...</span>
@@ -316,7 +289,8 @@
            <thead class="table-light">
              <tr>
                <th>Folio Local</th>
-               <th>Fecha Activación</th> <th>Paciente</th>
+               <th>Fecha Activación</th>
+               <th>Paciente</th>
                <th>Tipo de Activación</th>
                <th>Causa Clínica</th>
                <th>Acciones</th>
@@ -347,14 +321,13 @@
 </template>
 
 <script>
-// El script permanece exactamente igual
 import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/services/api';
 
 // Función para inicializar el estado del formulario
 const initialFormState = () => ({
-  fecha_activacion: new Date().toISOString().split('T')[0], // <= Valor inicial editable
-  hora_activacion: new Date().toTimeString().split(' ')[0].substring(0, 5), // <= Valor inicial editable
+  fecha_activacion: new Date().toISOString().split('T')[0],
+  hora_activacion: new Date().toTimeString().split(' ')[0].substring(0, 5),
   origen_reporte: 'Local',
   num_reporte_externo: '',
   requirio_traslado: false,
@@ -364,6 +337,7 @@ const initialFormState = () => ({
   paciente_sexo: '',
   causa_clinica_especifica: '',
   ct_especifico: '',
+  tipo_activacion_otro: '', // <-- ¡NUEVO CAMPO AÑADIDO!
   id_tipo_activacion: null,
   id_unidad_asignada: null,
   id_causa_clinica: null,
@@ -381,34 +355,35 @@ const initialFormState = () => ({
 export default {
   name: 'RegistroPrehospitalario',
   setup() {
-    // --- Variables ---
     const catalogos = ref({});
     const formulario = ref(initialFormState());
     const mensaje = ref('');
     const tipoMensaje = ref('');
     const tieneReporteExterno = ref(false);
-    const showForm = ref(false); // Inicia mostrando la tabla
+    const showForm = ref(false);
     const activaciones = ref([]);
     const cargando = ref(true);
     const error = ref(null);
 
-    // --- Computadas ---
     const pageTitle = computed(() => (showForm.value ? 'Nuevo Registro Prehospitalario' : 'Registros del Día'));
-    const currentDate = computed(() => new Date().toISOString().split('T')[0]); // Para mostrar fecha captura
-    const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5)); // Para mostrar hora captura
+    // Para mostrar Fecha/Hora de Captura (NO se envían)
+    const currentDate = computed(() => new Date().toISOString().split('T')[0]);
+    const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5));
+
     const isAnisocoria = computed(() => {
         const pupilaSeleccionada = catalogos.value.estados_pupilas?.find(p => p.id === formulario.value.evaluacion.id_estado_pupilas);
         return pupilaSeleccionada?.nombre.toLowerCase().includes('anisocóricas');
     });
+
+    // Computada para mostrar campo "Otro" en Tipo de Activación
     const mostrarOtroTipoActivacion = computed(() => {
         if (!catalogos.value.tipos_activacion) return false;
         const tipoSeleccionado = catalogos.value.tipos_activacion.find(
             t => t.id === formulario.value.id_tipo_activacion
         );
-        return tipoSeleccionado?.nombre?.toLowerCase() === 'otro';
+        return tipoSeleccionado?.nombre === 'Otro'; // Sensible a mayúsculas
     });
 
-    // --- Métodos ---
     const toggleFormVisibility = () => {
       showForm.value = !showForm.value;
       if (showForm.value) {
@@ -419,17 +394,17 @@ export default {
     };
 
     const cargarActivaciones = async () => {
-        cargando.value = true;
-        error.value = null;
-        try {
-            const response = await api.get('/activaciones?scope=today');
-            activaciones.value = response.data;
-        } catch (err) {
-            console.error("Error al cargar activaciones:", err);
-            error.value = 'No se pudieron cargar los registros.';
-        } finally {
-            cargando.value = false;
-        }
+      cargando.value = true;
+      error.value = null;
+      try {
+        const response = await api.get('/activaciones?scope=today');
+        activaciones.value = response.data;
+      } catch (err) {
+        console.error("Error al cargar activaciones:", err);
+        error.value = 'No se pudieron cargar los registros.';
+      } finally {
+        cargando.value = false;
+      }
     };
 
     const cargarCatalogos = async () => {
@@ -443,10 +418,32 @@ export default {
         }
     };
 
+    onMounted(() => {
+      cargarCatalogos();
+      cargarActivaciones();
+    });
+
     const registrarActivacion = async () => {
       try {
         const payload = { ...formulario.value };
         if (payload.paciente_edad === '') payload.paciente_edad = null;
+        
+        // Limpiar el campo "Otro" si no está seleccionado
+        if (!mostrarOtroTipoActivacion.value) {
+            payload.tipo_activacion_otro = ''; 
+        }
+
+        // Validar lógica de traslado antes de enviar
+        if (payload.requirio_traslado && (!payload.hospital_destino || payload.hospital_destino.trim() === '')) {
+            mensaje.value = 'Error: Si se trasladó, debe especificar el Hospital Destino.';
+            tipoMensaje.value = 'alert-danger';
+            return;
+        }
+        if (!payload.requirio_traslado && !payload.id_estado_traslado) {
+            mensaje.value = 'Error: Si no se trasladó, debe especificar el Estado del Servicio.';
+            tipoMensaje.value = 'alert-danger';
+            return;
+        }
 
         const resp = await api.post('/activaciones', payload);
         mensaje.value = `¡Éxito! Registro guardado con folio: ${resp.data.data.num_reporte_local}`;
@@ -476,11 +473,12 @@ export default {
         descripcion_lesion: ''
       });
     };
+
     const eliminarLesion = (index) => {
       formulario.value.lesiones.splice(index, 1);
     };
 
-    // --- Watchers ---
+    // Watch para la lógica de Reporte Externo
     watch(tieneReporteExterno, (esExterno) => {
       if (!esExterno) {
         formulario.value.origen_reporte = 'Local';
@@ -490,13 +488,18 @@ export default {
       }
     });
 
-    // --- Ciclo de vida ---
-    onMounted(() => {
-      cargarCatalogos();
-      cargarActivaciones();
+    // ===== ¡NUEVO WATCH PARA LA LÓGICA DE TRASLADO! =====
+    watch(() => formulario.value.requirio_traslado, (seTraslado) => {
+      if (seTraslado) {
+        // Si SÍ se trasladó, borramos la opción de "no traslado"
+        formulario.value.id_estado_traslado = null;
+      } else {
+        // Si NO se trasladó, borramos el nombre del hospital
+        formulario.value.hospital_destino = '';
+      }
     });
+    // ====================================================
 
-    // --- Return ---
     return {
       formulario, catalogos, mensaje, tipoMensaje, tieneReporteExterno,
       showForm, pageTitle, currentDate, currentTime, isAnisocoria,
