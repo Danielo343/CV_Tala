@@ -132,10 +132,10 @@ app.get('/api/catalogos', async (req, res) => {
 
 // Endpoint para crear una nueva activación (VERSIÓN FINAL, AHORA SÍ)
 app.post('/api/activaciones', async (req, res) => {
-  // 1. Leemos TODOS los campos del formulario, incluyendo los nuevos
+  // 1. Leemos TODOS los campos del formulario
   const {
-    fecha_activacion,
-    hora_activacion,
+    fecha_activacion, // Hora del evento (editable)
+    hora_activacion,  // Hora del evento (editable)
     origen_reporte,
     num_reporte_externo,
     requirio_traslado = false, // El switch (true/false)
@@ -145,7 +145,7 @@ app.post('/api/activaciones', async (req, res) => {
     paciente_sexo,
     causa_clinica_especifica,
     ct_especifico,
-    tipo_activacion_otro, // <-- ¡NUEVO CAMPO!
+    tipo_activacion_otro, // <-- ¡El nuevo campo!
     id_tipo_activacion,
     id_unidad_asignada = null,
     id_causa_clinica = null,
@@ -157,8 +157,6 @@ app.post('/api/activaciones', async (req, res) => {
   } = req.body;
 
   // 2. Lógica de traslado (como la pediste)
-  // Si SÍ se trasladó (true), guardamos el hospital y ponemos el estado en null.
-  // Si NO se trasladó (false), guardamos el estado y ponemos el hospital en null.
   const final_hospital_destino = requirio_traslado ? hospital_destino : null;
   const final_id_estado_traslado = !requirio_traslado ? id_estado_traslado : null;
 
@@ -252,27 +250,46 @@ app.post('/api/activaciones', async (req, res) => {
   }
 });
 
+// Endpoint para OBTENER activaciones (AHORA CON FILTROS)
 app.get('/api/activaciones', async (req, res) => {
-  const { scope } = req.query; // Leemos el parámetro "scope" de la URL
+  // Leemos los posibles filtros de la URL (scope, fecha_inicio, fecha_fin)
+  const { scope, fecha_inicio, fecha_fin } = req.query;
 
   try {
     let query = `
       SELECT 
-        a.id, a.num_reporte_local, a.fecha_activacion, a.paciente_nombre,
-        ta.nombre AS tipo_activacion, cc.nombre AS causa_clinica
-      FROM activaciones AS a
-      LEFT JOIN tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
-      LEFT JOIN causa_clinica AS cc ON a.id_causa_clinica = cc.id
+        a.id,
+        a.num_reporte_local,
+        a.fecha_activacion,
+        a.hora_activacion,
+        a.paciente_nombre,
+        ta.nombre AS tipo_activacion,
+        cc.nombre AS causa_clinica
+      FROM 
+        activaciones AS a
+      LEFT JOIN 
+        tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
+      LEFT JOIN 
+        causa_clinica AS cc ON a.id_causa_clinica = cc.id
     `;
     
-    // Si la URL pide los de hoy, añadimos el filtro WHERE
+    const values = [];
+
+    // Lógica de filtros
     if (scope === 'today') {
+      // Para la tabla de "Registros del Día"
       query += ' WHERE a.fecha_activacion = CURRENT_DATE ';
+    } else if (fecha_inicio && fecha_fin) {
+      // Para la nueva vista de "Consultas"
+      values.push(fecha_inicio, fecha_fin);
+      query += ' WHERE a.fecha_activacion BETWEEN $1 AND $2 ';
     }
-    
+    // Si no hay filtros, simplemente trae todo
+
     query += ' ORDER BY a.fecha_activacion DESC, a.hora_activacion DESC;';
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, values);
+
     res.json(result.rows);
 
   } catch (err) {

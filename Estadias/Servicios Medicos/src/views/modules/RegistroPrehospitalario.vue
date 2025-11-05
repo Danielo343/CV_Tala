@@ -3,15 +3,16 @@
     <div class="page-header">
       <h1 class="page-title">{{ pageTitle }}</h1>
       <div class="page-actions">
-         <button @click="toggleFormVisibility" class="btn btn-primary">
-           <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
-           <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
-         </button>
+        <button @click="toggleFormVisibility" class="btn btn-primary">
+          <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
+          <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
+        </button>
       </div>
     </div>
 
     <div class="main-content">
       <div v-if="showForm">
+        <!-- FORMULARIO DE NUEVO REGISTRO -->
         <div class="form-header">
           <h2>Nuevo Registro de Atención Prehospitalaria</h2>
           <p class="text-muted">La hora de captura se guarda automáticamente.</p>
@@ -23,6 +24,7 @@
 
         <form @submit.prevent="registrarActivacion" class="form-container-stacked">
 
+          <!-- SECCIÓN 1: Datos de Activación -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Datos de Activación</h3>
@@ -30,17 +32,17 @@
             <div class="card-body">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Fecha de Activación  (Hora del evento)</label>
+                  <label class="form-label">Fecha de Activación (Hora del evento)</label>
                   <input type="date" v-model="formulario.fecha_activacion" class="form-control" required>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Hora de Activación  (Hora del evento)</label>
+                  <label class="form-label">Hora de Activación (Hora del evento)</label>
                   <input type="time" v-model="formulario.hora_activacion" class="form-control" required>
                 </div>
               </div>
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Tipo de Activación </label>
+                  <label class="form-label">Tipo de Activación</label>
                   <select v-model="formulario.id_tipo_activacion" class="form-select" required>
                     <option :value="null" disabled>Seleccione una opción</option>
                     <option v-for="tipo in catalogos.tipos_activacion" :key="tipo.id" :value="tipo.id">{{ tipo.nombre }}</option>
@@ -90,6 +92,7 @@
             </div>
           </div>
 
+          <!-- SECCIÓN 2: Causa del Servicio -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-stethoscope me-2"></i>Causa del Servicio</h3>
@@ -132,6 +135,7 @@
             </div>
           </div>
 
+          <!-- SECCIÓN 3: Datos del Paciente -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-user-injured me-2"></i>Datos del Paciente</h3>
@@ -139,7 +143,7 @@
             <div class="card-body">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Nombre completo </label>
+                  <label class="form-label">Nombre completo</label>
                   <input type="text" v-model="formulario.paciente_nombre" class="form-control" placeholder="Ej: Juan Pérez" required>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -156,11 +160,12 @@
                     <option value="F">Femenino</option>
                     <option value="O">No definido</option>
                   </select>
-                  </div>
+                </div>
               </div>
             </div>
           </div>
 
+          <!-- SECCIÓN 4: Evaluación Clínica -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-heart-pulse me-2"></i>Evaluación Clínica</h3>
@@ -192,6 +197,7 @@
             </div>
           </div>
 
+          <!-- SECCIÓN 5: Registro de Lesiones -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-band-aid me-2"></i>Registro de Lesiones</h3>
@@ -229,7 +235,7 @@
                   <label class="form-label">Descripción de la Lesión</label>
                   <textarea v-model="lesion.descripcion_lesion" class="form-control" rows="2" placeholder="Detalles específicos..."></textarea>
                 </div>
-                </div>
+              </div>
               
               <div class="add-lesion-btn mt-3">
                 <button @click.prevent="agregarLesion" class="btn btn-outline-primary">
@@ -239,6 +245,7 @@
             </div>
           </div>
 
+          <!-- SECCIÓN 6: Traslado -->
           <div class="card shadow-sm mb-4 form-section">
             <div class="card-header section-header">
               <h3 class="mb-0"><i class="fas fa-ambulance me-2"></i>Traslado</h3>
@@ -250,23 +257,24 @@
               </div>
               <div v-if="formulario.requirio_traslado" class="row">
                   <div class="col-md-12 mb-3">
-                      <label class="form-label">Hospital Destino </label>
+                      <label class="form-label">Hospital Destino</label>
                       <input type="text" v-model="formulario.hospital_destino" class="form-control" placeholder="Nombre del hospital" required>
                   </div>
               </div>
               
               <div v-else class="row">
                   <div class="col-md-12 mb-3">
-                      <label class="form-label">Estado del Servicio </label>
+                      <label class="form-label">Estado del Servicio</label>
                       <select v-model="formulario.id_estado_traslado" class="form-select" required>
                           <option :value="null" disabled>Seleccione estado del servicio</option>
                           <option v-for="op in catalogos.estados_traslado" :key="op.id" :value="op.id">{{ op.nombre }}</option>
                       </select>
                   </div>
               </div>
-              </div>
+            </div>
           </div>
 
+          <!-- BOTÓN GUARDAR -->
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-lg">
               <i class="fas fa-save me-2"></i>
@@ -276,45 +284,123 @@
         </form>
       </div>
 
-      <div v-else class="p-3">
-         <div v-if="cargando" class="text-center p-5">
-           <div class="spinner-border text-primary" role="status">
-             <span class="visually-hidden">Cargando...</span>
-           </div>
-           <p class="mt-2">Cargando registros del día...</p>
-         </div>
-         <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
+      <!-- VISTA DE REGISTROS DEL DÍA (NUEVO DISEÑO) -->
+      <div v-else class="registros-container">
+        <!-- Header de Registros -->
+        <div class="registros-header">
+          <div class="header-content">
+            <div class="title-section">
+              <i class="fas fa-clipboard-list header-icon"></i>
+              <div>
+                <h2>Registros del Día</h2>
+                <p class="subtitle">{{ currentDateFormatted }}</p>
+              </div>
+            </div>
+            <div class="header-stats">
+              <div class="stat-card">
+                <div class="stat-value">{{ activaciones.length }}</div>
+                <div class="stat-label">Total Registros</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-         <table v-else-if="activaciones.length > 0" class="table table-hover align-middle">
-           <thead class="table-light">
-             <tr>
-               <th>Folio Local</th>
-               <th>Fecha Activación</th>
-               <th>Paciente</th>
-               <th>Tipo de Activación</th>
-               <th>Causa Clínica</th>
-               <th>Acciones</th>
-             </tr>
-           </thead>
-           <tbody>
-             <tr v-for="activacion in activaciones" :key="activacion.id">
-               <td><b>{{ activacion.num_reporte_local }}</b></td>
-               <td>{{ new Date(activacion.fecha_activacion).toLocaleDateString() }}</td>
-               <td>{{ activacion.paciente_nombre }}</td>
-               <td><span class="badge bg-secondary">{{ activacion.tipo_activacion || 'N/A' }}</span></td>
-               <td>{{ activacion.causa_clinica || 'N/A' }}</td>
-               <td>
-                 <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-               </td>
-             </tr>
-           </tbody>
-         </table>
+        <!-- Contenido Principal -->
+        <div class="registros-content">
+          <div v-if="cargando" class="loading-state">
+            <div class="spinner-container">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+              </div>
+              <p class="mt-3">Cargando registros del día...</p>
+            </div>
+          </div>
 
-         <div v-else class="empty-state">
-           <i class="fas fa-file-excel fa-4x mb-3"></i>
-           <h4>No hay registros para el día de hoy</h4>
-           <p class="text-muted">Haz clic en "Nuevo Registro" para crear el primero del día.</p>
-         </div>
+          <div v-else-if="error" class="error-state">
+            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+            <h4>Error al cargar registros</h4>
+            <p class="text-muted">{{ error }}</p>
+            <button class="btn btn-primary mt-2" @click="cargarActivaciones">
+              <i class="fas fa-redo me-2"></i>Reintentar
+            </button>
+          </div>
+
+          <div v-else-if="activaciones.length > 0" class="table-section">
+            <div class="table-container">
+              <div class="table-responsive">
+                <table class="registros-table">
+                  <thead>
+                    <tr>
+                      <th class="folio-col">Folio</th>
+                      <th class="fecha-col">Fecha y Hora</th>
+                      <th class="paciente-col">Paciente</th>
+                      <th class="tipo-col">Tipo</th>
+                      <th class="causa-col">Causa</th>
+                      <th class="acciones-col">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="activacion in activaciones" :key="activacion.id" class="registro-row">
+                      <td class="folio-cell">
+                        <div class="folio-badge">{{ activacion.num_reporte_local }}</div>
+                      </td>
+                      <td class="fecha-cell">
+                        <div class="fecha-text">
+                          {{ new Date(activacion.fecha_activacion).toLocaleDateString() }}
+                        </div>
+                        <div class="hora-text">{{ activacion.hora_activacion }}</div>
+                      </td>
+                      <td class="paciente-cell">
+                        <div class="paciente-nombre">{{ activacion.paciente_nombre }}</div>
+                        <div v-if="activacion.paciente_edad" class="paciente-info">
+                          {{ activacion.paciente_edad }} años • {{ activacion.paciente_sexo || 'N/D' }}
+                        </div>
+                      </td>
+                      <td class="tipo-cell">
+                        <span class="badge tipo-badge">{{ activacion.tipo_activacion || 'N/A' }}</span>
+                      </td>
+                      <td class="causa-cell">
+                        <span class="causa-text">{{ activacion.causa_clinica || 'N/A' }}</span>
+                      </td>
+                      <td class="acciones-cell">
+                        <div class="action-buttons">
+                          <button class="btn btn-sm btn-outline-primary action-btn">
+                            <i class="fas fa-eye me-1"></i>Ver
+                          </button>
+                          <button class="btn btn-sm btn-outline-secondary action-btn">
+                            <i class="fas fa-edit me-1"></i>Editar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="table-footer">
+                <div class="results-count">
+                  Mostrando {{ activaciones.length }} registro{{ activaciones.length !== 1 ? 's' : '' }} del día
+                </div>
+                <div class="table-actions">
+                  <button class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-download me-1"></i>Exportar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <div class="empty-icon">
+              <i class="fas fa-file-medical fa-3x"></i>
+            </div>
+            <h4>No hay registros para el día de hoy</h4>
+            <p class="text-muted">Haz clic en "Nuevo Registro" para crear el primero del día.</p>
+            <button class="btn btn-primary mt-3" @click="toggleFormVisibility">
+              <i class="fas fa-plus me-2"></i>Crear Nuevo Registro
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -324,9 +410,16 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/services/api';
 
-// Función para inicializar el estado del formulario
+// 🛠️ FUNCIÓN CORREGIDA para manejo de fechas
+const toISODate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const initialFormState = () => ({
-  fecha_activacion: new Date().toISOString().split('T')[0],
+  fecha_activacion: toISODate(new Date()), // 🛠️ Usar función corregida
   hora_activacion: new Date().toTimeString().split(' ')[0].substring(0, 5),
   origen_reporte: 'Local',
   num_reporte_externo: '',
@@ -337,7 +430,7 @@ const initialFormState = () => ({
   paciente_sexo: '',
   causa_clinica_especifica: '',
   ct_especifico: '',
-  tipo_activacion_otro: '', // <-- ¡NUEVO CAMPO AÑADIDO!
+  tipo_activacion_otro: '',
   id_tipo_activacion: null,
   id_unidad_asignada: null,
   id_causa_clinica: null,
@@ -355,6 +448,7 @@ const initialFormState = () => ({
 export default {
   name: 'RegistroPrehospitalario',
   setup() {
+    // --- Variables ---
     const catalogos = ref({});
     const formulario = ref(initialFormState());
     const mensaje = ref('');
@@ -365,25 +459,35 @@ export default {
     const cargando = ref(true);
     const error = ref(null);
 
+    // --- Computadas ---
     const pageTitle = computed(() => (showForm.value ? 'Nuevo Registro Prehospitalario' : 'Registros del Día'));
-    // Para mostrar Fecha/Hora de Captura (NO se envían)
     const currentDate = computed(() => new Date().toISOString().split('T')[0]);
     const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5));
+    
+    // Nueva computada para formatear la fecha del header
+    const currentDateFormatted = computed(() => {
+      return new Date().toLocaleDateString('es-ES', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    });
 
     const isAnisocoria = computed(() => {
         const pupilaSeleccionada = catalogos.value.estados_pupilas?.find(p => p.id === formulario.value.evaluacion.id_estado_pupilas);
         return pupilaSeleccionada?.nombre.toLowerCase().includes('anisocóricas');
     });
 
-    // Computada para mostrar campo "Otro" en Tipo de Activación
     const mostrarOtroTipoActivacion = computed(() => {
         if (!catalogos.value.tipos_activacion) return false;
         const tipoSeleccionado = catalogos.value.tipos_activacion.find(
             t => t.id === formulario.value.id_tipo_activacion
         );
-        return tipoSeleccionado?.nombre === 'Otro'; // Sensible a mayúsculas
+        return tipoSeleccionado?.nombre === 'Otro';
     });
 
+    // --- Métodos ---
     const toggleFormVisibility = () => {
       showForm.value = !showForm.value;
       if (showForm.value) {
@@ -393,12 +497,24 @@ export default {
       }
     };
 
+
+    // 🛠️ FUNCIÓN CORREGIDA para cargar activaciones
     const cargarActivaciones = async () => {
       cargando.value = true;
       error.value = null;
       try {
-        const response = await api.get('/activaciones?scope=today');
+        const hoy = toISODate(new Date()); // 🛠️ Usar función corregida
+        console.log('Buscando registros para:', hoy);
+        
+        const response = await api.get('/activaciones', {
+          params: {
+            fecha_inicio: hoy,
+            fecha_fin: hoy
+          }
+        });
+        
         activaciones.value = response.data;
+        console.log('Registros encontrados:', response.data.length);
       } catch (err) {
         console.error("Error al cargar activaciones:", err);
         error.value = 'No se pudieron cargar los registros.';
@@ -417,11 +533,6 @@ export default {
             tipoMensaje.value = 'alert-danger';
         }
     };
-
-    onMounted(() => {
-      cargarCatalogos();
-      cargarActivaciones();
-    });
 
     const registrarActivacion = async () => {
       try {
@@ -478,7 +589,7 @@ export default {
       formulario.value.lesiones.splice(index, 1);
     };
 
-    // Watch para la lógica de Reporte Externo
+    // --- Watchers ---
     watch(tieneReporteExterno, (esExterno) => {
       if (!esExterno) {
         formulario.value.origen_reporte = 'Local';
@@ -488,21 +599,25 @@ export default {
       }
     });
 
-    // ===== ¡NUEVO WATCH PARA LA LÓGICA DE TRASLADO! =====
     watch(() => formulario.value.requirio_traslado, (seTraslado) => {
       if (seTraslado) {
-        // Si SÍ se trasladó, borramos la opción de "no traslado"
         formulario.value.id_estado_traslado = null;
       } else {
-        // Si NO se trasladó, borramos el nombre del hospital
         formulario.value.hospital_destino = '';
       }
     });
-    // ====================================================
 
+    // --- Ciclo de vida ---
+    onMounted(() => {
+      cargarCatalogos();
+      cargarActivaciones();
+    });
+
+    // --- Return ---
     return {
       formulario, catalogos, mensaje, tipoMensaje, tieneReporteExterno,
       showForm, pageTitle, currentDate, currentTime, isAnisocoria,
+      currentDateFormatted, // <-- Nueva variable
       toggleFormVisibility, registrarActivacion, resetFormulario,
       agregarLesion, eliminarLesion,
       activaciones, cargando, error,
@@ -513,19 +628,50 @@ export default {
 </script>
 
 <style scoped>
-/* ESTILOS MEJORADOS PARA EL FORMULARIO */
+/* ESTILOS GENERALES */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  padding: 1.5rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
 
-/* Contenedor principal del formulario */
-.form-container {
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0056b3;
+  margin: 0;
+}
+
+.main-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.form-header h2 {
+  font-weight: 700;
+  color: #343a40;
+}
+
+/* ESTILOS DEL FORMULARIO (se mantienen igual) */
+.form-container-stacked {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
-/* Secciones del formulario */
-.card-section {
+.form-section {
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -533,24 +679,16 @@ export default {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.card-section:hover {
+.form-section:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
-/* Encabezado de sección */
 .section-header {
-  display: flex;
-  align-items: center;
   background: linear-gradient(135deg, #007bff, #0056b3);
   color: white;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #e9ecef;
-}
-
-.section-header i {
-  font-size: 1.5rem;
-  margin-right: 0.8rem;
 }
 
 .section-header h3 {
@@ -559,54 +697,6 @@ export default {
   font-size: 1.3rem;
 }
 
-/* Contenido de sección */
-.section-content {
-  padding: 1.5rem;
-}
-
-/* Estructura de filas y grupos de formulario */
-.form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-/* Etiquetas y controles de formulario */
-.form-label {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #495057;
-}
-
-.form-control, .form-select {
-  padding: 0.75rem;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.form-control:focus, .form-select:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-/* Campos de solo lectura */
-.readonly-fields .form-control {
-  background-color: #f8f9fa;
-  opacity: 0.8;
-}
-
-/* Grupos de checkboxes */
 .checkbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -620,12 +710,6 @@ export default {
   gap: 0.5rem;
 }
 
-/* Toggle switches */
-.toggle-group {
-  margin: 1rem 0;
-}
-
-/* Sección de lesiones */
 .empty-lesion {
   text-align: center;
   padding: 1.5rem;
@@ -669,7 +753,6 @@ export default {
   margin-top: 1rem;
 }
 
-/* Botones de acción */
 .form-actions {
   text-align: center;
   margin-top: 2rem;
@@ -677,53 +760,269 @@ export default {
   border-top: 1px solid #e9ecef;
 }
 
-/* Estilos existentes (mantener para compatibilidad) */
-.page-header {
+/* ESTILOS PARA LA NUEVA VISTA DE REGISTROS */
+.registros-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.registros-header {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2.5rem;
-  padding: 1.5rem 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--primary-dark);
-  margin: 0;
-}
-
-.main-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   padding: 2rem;
 }
 
-.form-header {
-  text-align: center;
-  margin-bottom: 2rem;
+.title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.form-header h2 {
+.header-icon {
+  font-size: 2.5rem;
+  opacity: 0.9;
+}
+
+.registros-header h2 {
+  font-size: 1.8rem;
   font-weight: 700;
-  color: var(--text-dark);
+  margin: 0;
 }
 
-.empty-state {
-  padding: 4rem;
+.subtitle {
+  opacity: 0.9;
+  margin: 0.25rem 0 0 0;
+  font-size: 1rem;
+}
+
+.header-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
   text-align: center;
-  background-color: #f8f9fa;
-  border-radius: 12px;
 }
 
-:root {
-  --primary: #007bff;
-  --primary-dark: #0056b3;
-  --text-dark: #343a40;
-  --border-color: #dee2e6;
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.registros-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.loading-state, .error-state, .empty-state {
+  padding: 3rem;
+  text-align: center;
+}
+
+.spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.error-state i {
+  color: #dc3545;
+}
+
+.empty-icon {
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.table-section {
+  padding: 0;
+}
+
+.table-container {
+  padding: 0;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.registros-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.registros-table thead {
+  background: #f8f9fa;
+}
+
+.registros-table th {
+  padding: 1rem;
+  font-weight: 600;
+  color: #495057;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.registros-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+}
+
+.registro-row:hover {
+  background: #f8f9fa;
+  transition: background-color 0.2s ease;
+}
+
+.folio-cell {
+  width: 120px;
+}
+
+.folio-badge {
+  background: #28a745;
+  color: white;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-align: center;
+  display: inline-block;
+}
+
+.fecha-cell {
+  width: 140px;
+}
+
+.fecha-text {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.hora-text {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.paciente-cell {
+  width: 220px;
+}
+
+.paciente-nombre {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.paciente-info {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.tipo-cell {
+  width: 150px;
+}
+
+.tipo-badge {
+  background: #6c757d;
+  color: white;
+  padding: 0.35rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+}
+
+.causa-cell {
+  min-width: 200px;
+}
+
+.causa-text {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.acciones-cell {
+  width: 160px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+}
+
+.table-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.results-count {
+  color: #6c757d;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.table-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .table-footer {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .table-actions {
+    justify-content: center;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
 }
 </style>
