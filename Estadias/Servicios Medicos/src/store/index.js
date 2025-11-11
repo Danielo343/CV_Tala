@@ -27,6 +27,7 @@ export default createStore({
     login({ commit }, user) {
       return AuthService.login(user).then(
         user => {
+          // 'user' ahora contiene el 'rol' gracias a nuestro cambio en el backend
           commit('loginSuccess', user)
           return Promise.resolve(user)
         },
@@ -43,6 +44,20 @@ export default createStore({
   },
   getters: {
     isLoggedIn: state => state.status.loggedIn,
-    currentUser: state => state.user
+    currentUser: state => state.user,
+
+    // --- 👇 ¡CAMBIOS AQUÍ! 👇 ---
+    // Creamos dos nuevos 'getters' para consultar el rol fácilmente
+
+    // Getter para obtener el string del rol (ej: 'admin', 'usuario')
+    userRole: state => {
+      return state.user ? state.user.rol : null;
+    },
+
+    // Getter de ayuda que nos dice true/false si es admin
+    isAdmin: state => {
+      return state.user && state.user.rol === 'admin';
+    }
+    // --- 👆 FIN DE LOS CAMBIOS 👆 ---
   }
 })

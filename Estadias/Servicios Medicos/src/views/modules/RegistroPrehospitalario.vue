@@ -3,7 +3,7 @@
     <div class="page-header">
       <h1 class="page-title">{{ pageTitle }}</h1>
       <div class="page-actions">
-        <button @click="toggleFormVisibility" class="btn btn-primary">
+        <button @click="abrirModalNuevo" class="btn btn-primary">
           <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
           <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
         </button>
@@ -11,282 +11,23 @@
     </div>
 
     <div class="main-content">
+      
       <div v-if="showForm">
-        <!-- FORMULARIO DE NUEVO REGISTRO -->
-        <div class="form-header">
-          <h2>Nuevo Registro de Atención Prehospitalaria</h2>
-          <p class="text-muted">La hora de captura se guarda automáticamente.</p>
-        </div>
-
-        <div v-if="mensaje" :class="['alert', tipoMensaje]">
-          {{ mensaje }}
-        </div>
-
-        <form @submit.prevent="registrarActivacion" class="form-container-stacked">
-
-          <!-- SECCIÓN 1: Datos de Activación -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Datos de Activación</h3>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Fecha de Activación (Hora del evento)</label>
-                  <input type="date" v-model="formulario.fecha_activacion" class="form-control" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Hora de Activación (Hora del evento)</label>
-                  <input type="time" v-model="formulario.hora_activacion" class="form-control" required>
-                </div>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Tipo de Activación</label>
-                  <select v-model="formulario.id_tipo_activacion" class="form-select" required>
-                    <option :value="null" disabled>Seleccione una opción</option>
-                    <option v-for="tipo in catalogos.tipos_activacion" :key="tipo.id" :value="tipo.id">{{ tipo.nombre }}</option>
-                  </select>
-                </div>
-                
-                <div v-if="mostrarOtroTipoActivacion" class="col-md-6 mb-3">
-                  <label class="form-label">Especifique "Otro" Tipo Activación</label>
-                  <input type="text" v-model="formulario.tipo_activacion_otro" class="form-control" placeholder="Describa el tipo de activación">
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Unidad Asignada</label>
-                  <select v-model="formulario.id_unidad_asignada" class="form-select">
-                    <option :value="null">Seleccione una unidad</option>
-                    <option v-for="unidad in catalogos.unidades" :key="unidad.id" :value="unidad.id">{{ unidad.nombre }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" v-model="tieneReporteExterno" id="checkReporteExterno">
-                <label class="form-check-label" for="checkReporteExterno">¿Tiene reporte externo? (C5, 911, etc.)</label>
-              </div>
-              <div v-if="tieneReporteExterno" class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Origen Reporte Externo</label>
-                  <select v-model="formulario.origen_reporte" class="form-select">
-                    <option value="C5">C5</option>
-                    <option value="R">9-1-1</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Número Reporte Externo</label>
-                  <input type="text" v-model="formulario.num_reporte_externo" class="form-control" placeholder="Folio C5 o 911">
-                </div>
-              </div>
-              <hr class="my-3">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-muted">Fecha de Captura (Automática)</label>
-                  <input type="date" :value="currentDate" class="form-control" disabled>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-muted">Hora de Captura (Automática)</label>
-                  <input type="time" :value="currentTime" class="form-control" disabled>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECCIÓN 2: Causa del Servicio -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-stethoscope me-2"></i>Causa del Servicio</h3>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Causa Clínica</label>
-                  <select v-model="formulario.id_causa_clinica" class="form-select">
-                    <option :value="null">Seleccione (si aplica)</option>
-                    <option v-for="causa in catalogos.causa_clinica" :key="causa.id" :value="causa.id">{{ causa.nombre }}</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Agente Causal General</label>
-                  <select v-model="formulario.id_agente_causante_general" class="form-select">
-                    <option :value="null">Seleccione (si aplica)</option>
-                    <option v-for="agente in catalogos.agentes_causantes" :key="agente.id" :value="agente.id">{{ agente.nombre }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Descripción Causa Clínica</label>
-                <textarea v-model="formulario.causa_clinica_especifica" class="form-control" rows="2" placeholder="Detalles adicionales de la causa clínica..."></textarea>
-              </div>
-              <hr class="my-3">
-              <div class="mb-3">
-                <label class="form-label">Causas Traumáticas</label>
-                <div class="checkbox-grid">
-                  <div v-for="causa in catalogos.causas_traumaticas" :key="causa.id" class="checkbox-item">
-                    <input class="form-check-input" type="checkbox" :value="causa.id" v-model="formulario.id_causas_traumaticas" :id="'causa-' + causa.id">
-                    <label class="form-check-label" :for="'causa-' + causa.id">{{ causa.nombre }}</label>
-                  </div>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Descripción Causa Traumática</label>
-                <textarea v-model="formulario.ct_especifico" class="form-control" rows="2" placeholder="Detalles adicionales de la causa traumática..."></textarea>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECCIÓN 3: Datos del Paciente -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-user-injured me-2"></i>Datos del Paciente</h3>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Nombre completo</label>
-                  <input type="text" v-model="formulario.paciente_nombre" class="form-control" placeholder="Ej: Juan Pérez" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Edad</label>
-                  <input type="number" v-model="formulario.paciente_edad" class="form-control" placeholder="Ej: 35" min="0" max="120">
-                </div>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Sexo</label>
-                  <select v-model="formulario.paciente_sexo" class="form-select">
-                    <option value="">Seleccione</option>
-                    <option value="M">Masculino</option>
-                    <option value="F">Femenino</option>
-                    <option value="O">No definido</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECCIÓN 4: Evaluación Clínica -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-heart-pulse me-2"></i>Evaluación Clínica</h3>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Estado de Pupilas</label>
-                  <select v-model="formulario.evaluacion.id_estado_pupilas" class="form-select">
-                    <option :value="null">Seleccione una opción</option>
-                    <option v-for="e in catalogos.estados_pupilas" :key="e.id" :value="e.id">{{ e.nombre }}</option>
-                  </select>
-                </div>
-                <div v-if="isAnisocoria" class="col-md-6 mb-3">
-                  <label class="form-label">Lado Anisocoria</label>
-                  <select v-model="formulario.evaluacion.anisocoria_lado" class="form-select">
-                    <option value="Der">Derecho</option>
-                    <option value="Izq">Izquierdo</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Estado de la Piel</label>
-                  <select v-model="formulario.evaluacion.id_estado_piel" class="form-select">
-                    <option :value="null">Seleccione una opción</option>
-                    <option v-for="e in catalogos.estados_piel" :key="e.id" :value="e.id">{{ e.nombre }}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECCIÓN 5: Registro de Lesiones -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-band-aid me-2"></i>Registro de Lesiones</h3>
-            </div>
-            <div class="card-body">
-              <div v-if="formulario.lesiones.length === 0" class="empty-lesion">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>No se han registrado lesiones.</p>
-              </div>
-              
-              <div v-for="(lesion, index) in formulario.lesiones" :key="index" class="lesion-item">
-                <div class="lesion-header">
-                  <h4>Lesión #{{ index + 1 }}</h4>
-                  <button @click.prevent="eliminarLesion(index)" class="btn btn-sm btn-outline-danger">
-                    <i class="fas fa-trash me-1"></i> Quitar
-                  </button>
-                </div>
-                <div class="row">
-                  <div class="col-md-6 mb-3">
-                    <label class="form-label">Tipo de Lesión</label>
-                    <select v-model="lesion.id_tipo_lesion" class="form-select">
-                      <option :value="null">Seleccione tipo</option>
-                      <option v-for="t in catalogos.tipos_lesion" :key="t.id" :value="t.id">{{ t.nombre }}</option>
-                    </select>
-                  </div>
-                  <div class="col-md-6 mb-3">
-                    <label class="form-label">Ubicación de la Lesión</label>
-                    <select v-model="lesion.id_ubicacion_lesion" class="form-select">
-                      <option :value="null">Seleccione ubicación</option>
-                      <option v-for="u in catalogos.ubicaciones_lesion" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Descripción de la Lesión</label>
-                  <textarea v-model="lesion.descripcion_lesion" class="form-control" rows="2" placeholder="Detalles específicos..."></textarea>
-                </div>
-              </div>
-              
-              <div class="add-lesion-btn mt-3">
-                <button @click.prevent="agregarLesion" class="btn btn-outline-primary">
-                  <i class="fas fa-plus me-2"></i> Agregar Lesión
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECCIÓN 6: Traslado -->
-          <div class="card shadow-sm mb-4 form-section">
-            <div class="card-header section-header">
-              <h3 class="mb-0"><i class="fas fa-ambulance me-2"></i>Traslado</h3>
-            </div>
-            <div class="card-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" v-model="formulario.requirio_traslado" id="checkTraslado">
-                <label class="form-check-label" for="checkTraslado">¿Se trasladó?</label>
-              </div>
-              <div v-if="formulario.requirio_traslado" class="row">
-                  <div class="col-md-12 mb-3">
-                      <label class="form-label">Hospital Destino</label>
-                      <input type="text" v-model="formulario.hospital_destino" class="form-control" placeholder="Nombre del hospital" required>
-                  </div>
-              </div>
-              
-              <div v-else class="row">
-                  <div class="col-md-12 mb-3">
-                      <label class="form-label">Estado del Servicio</label>
-                      <select v-model="formulario.id_estado_traslado" class="form-select" required>
-                          <option :value="null" disabled>Seleccione estado del servicio</option>
-                          <option v-for="op in catalogos.estados_traslado" :key="op.id" :value="op.id">{{ op.nombre }}</option>
-                      </select>
-                  </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- BOTÓN GUARDAR -->
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary btn-lg">
-              <i class="fas fa-save me-2"></i>
-              <b>Guardar Registro</b>
-            </button>
-          </div>
-        </form>
+        <FormActivacion
+          :catalogs="catalogos"
+          :initialData="datosParaEditar"
+          :loading="cargandoFormulario"
+          :saving="isSaving"
+          :titulo="modoEdicion ? 'Editar Registro' : 'Nuevo Registro de Atención Prehospitalaria'"
+          :subtitulo="modoEdicion ? `Folio: ${datosParaEditar?.num_reporte_local}` : 'La hora de captura se guarda automáticamente.'"
+          :mensaje="mensaje"
+          :tipoMensaje="tipoMensaje"
+          @save="guardarRegistro"
+          @cancel="toggleFormVisibility"
+          @save-error="mostrarError"
+        />
       </div>
-
-      <!-- VISTA DE REGISTROS DEL DÍA (NUEVO DISEÑO) -->
       <div v-else class="registros-container">
-        <!-- Header de Registros -->
         <div class="registros-header">
           <div class="header-content">
             <div class="title-section">
@@ -305,7 +46,6 @@
           </div>
         </div>
 
-        <!-- Contenido Principal -->
         <div class="registros-content">
           <div v-if="cargando" class="loading-state">
             <div class="spinner-container">
@@ -364,10 +104,18 @@
                       </td>
                       <td class="acciones-cell">
                         <div class="action-buttons">
-                          <button class="btn btn-sm btn-outline-primary action-btn">
+                          <button 
+                            class="btn btn-sm btn-outline-primary action-btn"
+                            @click="verDetalle(activacion)"
+                          >
                             <i class="fas fa-eye me-1"></i>Ver
                           </button>
-                          <button class="btn btn-sm btn-outline-secondary action-btn">
+                          
+                          <button 
+                            v-if="isAdmin" 
+                            class="btn btn-sm btn-outline-secondary action-btn"
+                            @click="abrirModalEditar(activacion)" 
+                          >
                             <i class="fas fa-edit me-1"></i>Editar
                           </button>
                         </div>
@@ -396,75 +144,216 @@
             </div>
             <h4>No hay registros para el día de hoy</h4>
             <p class="text-muted">Haz clic en "Nuevo Registro" para crear el primero del día.</p>
-            <button class="btn btn-primary mt-3" @click="toggleFormVisibility">
+            <button class="btn btn-primary mt-3" @click="abrirModalNuevo">
               <i class="fas fa-plus me-2"></i>Crear Nuevo Registro
             </button>
           </div>
         </div>
       </div>
     </div>
+
+    <div class="modal fade" id="modalDetalleActivacion" ref="modalDetalleRef" tabindex="-1" aria-labelledby="modalDetalleLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalDetalleLabel">
+              <i class="fas fa-file-invoice me-2"></i>
+              Detalle del Registro
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body modal-body-detallado">
+            
+            <div v-if="cargandoDetalle" class="loading-state-modal">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+              </div>
+              <p class="mt-3">Cargando detalles del registro...</p>
+            </div>
+
+            <div v-else-if="activacionSeleccionada">
+              <div class="detalle-header">
+                <h3>Folio: <span class="text-primary">{{ activacionSeleccionada.num_reporte_local }}</span></h3>
+                <p class="text-muted">
+                  Capturado el: {{ formatDateForDisplay(activacionSeleccionada.fecha_captura) }} a las {{ activacionSeleccionada.hora_captura }}
+                </p>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-user-injured me-2"></i> Datos del Paciente
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item"><strong>Nombre:</strong> {{ activacionSeleccionada.paciente_nombre }}</li>
+                  <li class="list-group-item"><strong>Edad:</strong> {{ activacionSeleccionada.paciente_edad || 'N/A' }} años</li>
+                  <li class="list-group-item"><strong>Sexo:</strong> {{ activacionSeleccionada.paciente_sexo || 'N/A' }}</li>
+                </ul>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-file-invoice me-2"></i> Datos de Activación
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item"><strong>Fecha/Hora Evento:</strong> {{ formatDateForDisplay(activacionSeleccionada.fecha_activacion) }} a las {{ activacionSeleccionada.hora_activacion }}</li>
+                  <li class="list-group-item"><strong>Tipo Activación:</strong> {{ activacionSeleccionada.tipo_activacion_nombre || 'N/A' }}</li>
+                  <li v-if="activacionSeleccionada.tipo_activacion_otro" class="list-group-item"><strong>Otro Tipo:</strong> {{ activacionSeleccionada.tipo_activacion_otro }}</li>
+                  <li class="list-group-item"><strong>Unidad Asignada:</strong> {{ activacionSeleccionada.unidad_asignada_nombre || 'N/A' }}</li>
+                  <li class="list-group-item"><strong>Origen Reporte:</strong> {{ activacionSeleccionada.origen_reporte }}</li>
+                  <li v-if="activacionSeleccionada.num_reporte_externo" class="list-group-item"><strong>Folio Externo:</strong> {{ activacionSeleccionada.num_reporte_externo }}</li>
+                </ul>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-stethoscope me-2"></i> Causa del Servicio
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item"><strong>Causa Clínica:</strong> {{ activacionSeleccionada.causa_clinica_nombre || 'N/A' }}</li>
+                  <li class="list-group-item"><strong>Agente Causal:</strong> {{ activacionSeleccionada.agente_causante_general_nombre || 'N/A' }}</li>
+                  <li v-if="activacionSeleccionada.causa_clinica_especifica" class="list-group-item"><strong>Desc. Clínica:</strong> {{ activacionSeleccionada.causa_clinica_especifica }}</li>
+                  <li v-if="activacionSeleccionada.causas_traumaticas_nombres && activacionSeleccionada.causas_traumaticas_nombres.length > 0" class="list-group-item">
+                    <strong>Causas Traumáticas:</strong>
+                    <ul class="mt-2">
+                      <li v-for="causa in activacionSeleccionada.causas_traumaticas_nombres" :key="causa">{{ causa }}</li>
+                    </ul>
+                  </li>
+                  <li v-if="activacionSeleccionada.ct_especifico" class="list-group-item"><strong>Desc. Traumática:</strong> {{ activacionSeleccionada.ct_especifico }}</li>
+                </ul>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-heart-pulse me-2"></i> Evaluación Clínica
+                </div>
+                <div v-if="activacionSeleccionada.evaluacion">
+                  <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Estado Pupilas:</strong> {{ activacionSeleccionada.evaluacion.estado_pupilas_nombre || 'N/A' }}</li>
+                    <li v-if="activacionSeleccionada.evaluacion.anisocoria_lado" class="list-group-item"><strong>Lado Anisocoria:</strong> {{ activacionSeleccionada.evaluacion.anisocoria_lado }}</li>
+                    <li class="list-group-item"><strong>Estado Piel:</strong> {{ activacionSeleccionada.evaluacion.estado_piel_nombre || 'N/A' }}</li>
+                  </ul>
+                </div>
+                <div v-else class="list-group-item text-muted">
+                  No se registró evaluación clínica.
+                </div>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-band-aid me-2"></i> Lesiones Registradas
+                </div>
+                <div v-if="activacionSeleccionada.lesiones && activacionSeleccionada.lesiones.length > 0">
+                  <ul class="list-group list-group-flush">
+                    <li v-for="(lesion, index) in activacionSeleccionada.lesiones" :key="index" class="list-group-item">
+                      <strong>{{ lesion.tipo_lesion_nombre || 'Lesión' }}</strong> en <strong>{{ lesion.ubicacion_lesion_nombre || 'N/D' }}</strong>
+                      <p v-if="lesion.descripcion_lesion" class="text-muted mb-0">{{ lesion.descripcion_lesion }}</p>
+                    </li>
+                  </ul>
+                </div>
+                <div v-else class="list-group-item text-muted">
+                  No se registraron lesiones.
+                </div>
+              </div>
+
+              <div class="detalle-seccion card">
+                <div class="card-header">
+                  <i class="fas fa-ambulance me-2"></i> Traslado
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">
+                    <strong>¿Se trasladó?:</strong> 
+                    <span :class="activacionSeleccionada.requirio_traslado ? 'text-success' : 'text-danger'">
+                      {{ activacionSeleccionada.requirio_traslado ? 'Sí' : 'No' }}
+                    </span>
+                  </li>
+                  <li v-if="activacionSeleccionada.requirio_traslado" class="list-group-item"><strong>Hospital Destino:</strong> {{ activacionSeleccionada.hospital_destino }}</li>
+                  <li v-else class="list-group-item"><strong>Estado del Servicio:</strong> {{ activacionSeleccionada.estado_traslado_nombre || 'N/A' }}</li>
+                </ul>
+              </div>
+
+            </div>
+            
+            <div v-else-if="errorDetalle" class="error-state-modal">
+              <i class="fas fa-exclamation-triangle fa-2x mb-3 text-danger"></i>
+              <h4>Error al cargar el detalle</h4>
+              <p class="text-muted">{{ errorDetalle }}</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>Cerrar
+            </button>
+            <button type="button" class="btn btn-primary">
+              <i class="fas fa-print me-2"></i>Imprimir Ficha
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from 'vue';
+// --- 👇 SCRIPT SETUP COMPLETAMENTE REFACTORIZADO 👇 ---
+import { ref, onMounted, computed } from 'vue'; // <--- Eliminamos 'watch'
+import { useStore } from 'vuex';
 import api from '@/services/api';
+import { Modal } from 'bootstrap'; 
+// --- CAMBIO ---
+// Importamos el nuevo componente que hicimos en el Paso 1
+import FormActivacion from '@/components/FormActivacion.vue'; 
 
-// 🛠️ FUNCIÓN CORREGIDA para manejo de fechas
-const toISODate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+// --- Función Helper (solo la de formato, las otras se fueron al form) ---
+const formatDateForDisplay = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  const adjustedDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  return adjustedDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
-
-const initialFormState = () => ({
-  fecha_activacion: toISODate(new Date()), // 🛠️ Usar función corregida
-  hora_activacion: new Date().toTimeString().split(' ')[0].substring(0, 5),
-  origen_reporte: 'Local',
-  num_reporte_externo: '',
-  requirio_traslado: false,
-  hospital_destino: '',
-  paciente_nombre: '',
-  paciente_edad: null,
-  paciente_sexo: '',
-  causa_clinica_especifica: '',
-  ct_especifico: '',
-  tipo_activacion_otro: '',
-  id_tipo_activacion: null,
-  id_unidad_asignada: null,
-  id_causa_clinica: null,
-  id_causas_traumaticas: [],
-  id_agente_causante_general: null,
-  id_estado_traslado: null,
-  evaluacion: {
-    id_estado_pupilas: null,
-    id_estado_piel: null,
-    anisocoria_lado: null
-  },
-  lesiones: []
-});
 
 export default {
   name: 'RegistroPrehospitalario',
+  // --- CAMBIO ---
+  // Añadimos el componente al registro
+  components: {
+    FormActivacion
+  },
   setup() {
-    // --- Variables ---
+    // --- Estado de la Vista ---
+    const store = useStore();
+    const isAdmin = computed(() => store.getters.isAdmin);
+    
     const catalogos = ref({});
-    const formulario = ref(initialFormState());
     const mensaje = ref('');
     const tipoMensaje = ref('');
-    const tieneReporteExterno = ref(false);
-    const showForm = ref(false);
+    const showForm = ref(false); // true = muestra el formulario, false = muestra la tabla
     const activaciones = ref([]);
-    const cargando = ref(true);
+    const cargando = ref(true); // Cargando de la tabla
     const error = ref(null);
 
+    // --- Estado para el Modal de "Ver Detalle" ---
+    const modalDetalleRef = ref(null); 
+    let modalDetalle = null; 
+    const activacionSeleccionada = ref(null); 
+    const cargandoDetalle = ref(false); 
+    const errorDetalle = ref(null); 
+
+    // --- Estado para el Formulario de "Editar/Crear" ---
+    const modoEdicion = ref(false); 
+    const idRegistroEditando = ref(null); 
+    const cargandoFormulario = ref(false); // Spinner para el formulario
+    const isSaving = ref(false); // Para deshabilitar el botón "Guardar"
+    const datosParaEditar = ref(null); // Aquí guardamos los datos para pasar al form
+
     // --- Computadas ---
-    const pageTitle = computed(() => (showForm.value ? 'Nuevo Registro Prehospitalario' : 'Registros del Día'));
-    const currentDate = computed(() => new Date().toISOString().split('T')[0]);
-    const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5));
+    const pageTitle = computed(() => {
+      if (showForm.value) {
+        return modoEdicion.value ? 'Editar Registro' : 'Nuevo Registro Prehospitalario';
+      }
+      return 'Registros del Día';
+    });
     
-    // Nueva computada para formatear la fecha del header
     const currentDateFormatted = computed(() => {
       return new Date().toLocaleDateString('es-ES', {
         weekday: 'long',
@@ -474,47 +363,51 @@ export default {
       });
     });
 
-    const isAnisocoria = computed(() => {
-        const pupilaSeleccionada = catalogos.value.estados_pupilas?.find(p => p.id === formulario.value.evaluacion.id_estado_pupilas);
-        return pupilaSeleccionada?.nombre.toLowerCase().includes('anisocóricas');
-    });
-
-    const mostrarOtroTipoActivacion = computed(() => {
-        if (!catalogos.value.tipos_activacion) return false;
-        const tipoSeleccionado = catalogos.value.tipos_activacion.find(
-            t => t.id === formulario.value.id_tipo_activacion
-        );
-        return tipoSeleccionado?.nombre === 'Otro';
-    });
-
-    // --- Métodos ---
+    // --- Métodos de la Vista ---
     const toggleFormVisibility = () => {
-      showForm.value = !showForm.value;
-      if (showForm.value) {
-        resetFormulario();
-      } else {
-        cargarActivaciones();
-      }
+      showForm.value = false;
+      mensaje.value = ''; // Limpiamos mensajes al cerrar
+      datosParaEditar.value = null; // Limpiamos los datos de edición
     };
 
+    const abrirModalNuevo = () => {
+      datosParaEditar.value = null; // Le pasamos 'null' al form para que sepa que es "Nuevo"
+      modoEdicion.value = false;
+      idRegistroEditando.value = null;
+      showForm.value = true;
+    };
 
-    // 🛠️ FUNCIÓN CORREGIDA para cargar activaciones
+    const abrirModalEditar = async (activacion) => {
+      modoEdicion.value = true;
+      idRegistroEditando.value = activacion.id;
+      datosParaEditar.value = null; // Resetea por si acaso
+      showForm.value = true;
+      cargandoFormulario.value = true; // Mostramos spinner
+      mensaje.value = '';
+
+      try {
+        // Usamos el endpoint GET/:id para traer TODOS los datos
+        const response = await api.get(`/activaciones/${activacion.id}`);
+        datosParaEditar.value = response.data; // Pasamos los datos al formulario hijo
+        
+      } catch (err) {
+        console.error("Error al cargar datos para editar:", err);
+        mensaje.value = 'Error al cargar los datos del registro.';
+        tipoMensaje.value = 'alert-danger';
+        showForm.value = false; // Cerramos si falla
+      } finally {
+        cargandoFormulario.value = false; // Ocultamos spinner
+      }
+    };
+    
     const cargarActivaciones = async () => {
       cargando.value = true;
       error.value = null;
       try {
-        const hoy = toISODate(new Date()); // 🛠️ Usar función corregida
-        console.log('Buscando registros para:', hoy);
-        
         const response = await api.get('/activaciones', {
-          params: {
-            fecha_inicio: hoy,
-            fecha_fin: hoy
-          }
+          params: { scope: 'today' }
         });
-        
         activaciones.value = response.data;
-        console.log('Registros encontrados:', response.data.length);
       } catch (err) {
         console.error("Error al cargar activaciones:", err);
         error.value = 'No se pudieron cargar los registros.';
@@ -534,100 +427,121 @@ export default {
         }
     };
 
-    const registrarActivacion = async () => {
+    // --- Métodos que manejan eventos del FormActivacion ---
+    
+    // Se dispara con el @save-error del formulario
+    const mostrarError = (msg) => {
+      mensaje.value = msg;
+      tipoMensaje.value = 'alert-danger';
+    };
+
+    // Se dispara con el @save del formulario
+    const guardarRegistro = async (payload) => {
+      isSaving.value = true; // Deshabilitamos el botón de guardar
+      mensaje.value = '';
+      tipoMensaje.value = '';
+
       try {
-        const payload = { ...formulario.value };
-        if (payload.paciente_edad === '') payload.paciente_edad = null;
-        
-        // Limpiar el campo "Otro" si no está seleccionado
-        if (!mostrarOtroTipoActivacion.value) {
-            payload.tipo_activacion_otro = ''; 
+        if (modoEdicion.value) {
+          // --- MODO EDICIÓN (PUT) ---
+          const resp = await api.put(`/api/activaciones/${idRegistroEditando.value}`, payload);
+          mensaje.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`;
+          tipoMensaje.value = 'alert-success';
+        } else {
+          // --- MODO CREACIÓN (POST) ---
+          const resp = await api.post('/activaciones', payload);
+          mensaje.value = `¡Éxito! Registro guardado con folio: ${resp.data.data.num_reporte_local}`;
+          tipoMensaje.value = 'alert-success';
         }
 
-        // Validar lógica de traslado antes de enviar
-        if (payload.requirio_traslado && (!payload.hospital_destino || payload.hospital_destino.trim() === '')) {
-            mensaje.value = 'Error: Si se trasladó, debe especificar el Hospital Destino.';
-            tipoMensaje.value = 'alert-danger';
-            return;
-        }
-        if (!payload.requirio_traslado && !payload.id_estado_traslado) {
-            mensaje.value = 'Error: Si no se trasladó, debe especificar el Estado del Servicio.';
-            tipoMensaje.value = 'alert-danger';
-            return;
-        }
-
-        const resp = await api.post('/activaciones', payload);
-        mensaje.value = `¡Éxito! Registro guardado con folio: ${resp.data.data.num_reporte_local}`;
-        tipoMensaje.value = 'alert-success';
-
+        // Después de guardar, cerramos el form y recargamos la tabla
         setTimeout(() => {
-          mensaje.value = '';
-          showForm.value = false;
-          cargarActivaciones();
+          toggleFormVisibility(); // Cierra el formulario
+          cargarActivaciones(); // Recargamos la tabla de "Registros del Día"
         }, 2500);
+
       } catch (error) {
          console.error("Error al guardar:", error.response || error);
         mensaje.value = `Error al guardar: ${error.response?.data?.error || 'Verifique los datos e intente de nuevo.'}`;
         tipoMensaje.value = 'alert-danger';
+      } finally {
+        isSaving.value = false; // Volvemos a habilitar el botón
       }
     };
 
-    const resetFormulario = () => {
-        formulario.value = initialFormState();
-        tieneReporteExterno.value = false;
-    };
-
-    const agregarLesion = () => {
-      formulario.value.lesiones.push({
-        id_tipo_lesion: null,
-        id_ubicacion_lesion: null,
-        descripcion_lesion: ''
-      });
-    };
-
-    const eliminarLesion = (index) => {
-      formulario.value.lesiones.splice(index, 1);
-    };
-
-    // --- Watchers ---
-    watch(tieneReporteExterno, (esExterno) => {
-      if (!esExterno) {
-        formulario.value.origen_reporte = 'Local';
-        formulario.value.num_reporte_externo = '';
-      } else {
-        formulario.value.origen_reporte = 'C5';
+    // --- Métodos del Modal de Detalle (Sin cambios) ---
+    const verDetalle = async (activacion) => {
+      if (!modalDetalle) return;
+      cargandoDetalle.value = true;
+      errorDetalle.value = null;
+      activacionSeleccionada.value = null; 
+      modalDetalle.show();
+      try {
+        const response = await api.get(`/activaciones/${activacion.id}`);
+        activacionSeleccionada.value = response.data;
+      } catch (err) {
+        console.error("Error al cargar detalle:", err);
+        errorDetalle.value = 'No se pudo cargar la información del registro.';
+      } finally {
+        cargandoDetalle.value = false;
       }
-    });
-
-    watch(() => formulario.value.requirio_traslado, (seTraslado) => {
-      if (seTraslado) {
-        formulario.value.id_estado_traslado = null;
-      } else {
-        formulario.value.hospital_destino = '';
-      }
-    });
+    };
 
     // --- Ciclo de vida ---
     onMounted(() => {
       cargarCatalogos();
       cargarActivaciones();
+      
+      if (modalDetalleRef.value) {
+        modalDetalle = new Modal(modalDetalleRef.value);
+      }
     });
 
-    // --- Return ---
+    // --- Return (Ahora mucho más limpio) ---
     return {
-      formulario, catalogos, mensaje, tipoMensaje, tieneReporteExterno,
-      showForm, pageTitle, currentDate, currentTime, isAnisocoria,
-      currentDateFormatted, // <-- Nueva variable
-      toggleFormVisibility, registrarActivacion, resetFormulario,
-      agregarLesion, eliminarLesion,
-      activaciones, cargando, error,
-      mostrarOtroTipoActivacion
+      // Estado de la Vista
+      isAdmin,
+      showForm,
+      catalogoBorrador: catalogos, // Renombrado para evitar conflicto de nombres
+      catalogos,
+      mensaje,
+      tipoMensaje,
+      activaciones,
+      cargando,
+      error,
+      currentDateFormatted, 
+      
+      // Estado del Formulario (manejado por esta vista)
+      modoEdicion,
+      cargandoFormulario,
+      isSaving,
+      datosParaEditar,
+
+      // Métodos de la Vista
+      abrirModalNuevo,
+      abrirModalEditar,
+      toggleFormVisibility, 
+      guardarRegistro,
+      mostrarError,
+      
+      // Lógica del Modal "Ver Detalle"
+      modalDetalleRef,
+      cargandoDetalle,
+      errorDetalle,
+      activacionSeleccionada,
+      verDetalle,
+      formatDateForDisplay,
+      
+      // Computadas de la Vista
+      pageTitle
     };
   }
 }
 </script>
 
 <style scoped>
+/* (Todos los estilos se mantienen exactamente igual) */
+
 /* ESTILOS GENERALES */
 .page-header {
   display: flex;
@@ -654,6 +568,8 @@ export default {
   padding: 2rem;
 }
 
+/* --- ESTILOS PARA EL FORMULARIO (AHORA EN EL HIJO) --- */
+/* (Estos estilos son aplicados al componente hijo <FormActivacion />) */
 .form-header {
   text-align: center;
   margin-bottom: 2rem;
@@ -664,103 +580,7 @@ export default {
   color: #343a40;
 }
 
-/* ESTILOS DEL FORMULARIO (se mantienen igual) */
-.form-container-stacked {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-section {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-section:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-}
-
-.section-header {
-  background: linear-gradient(135deg, #007bff, #0056b3);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.section-header h3 {
-  margin: 0;
-  font-weight: 600;
-  font-size: 1.3rem;
-}
-
-.checkbox-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.empty-lesion {
-  text-align: center;
-  padding: 1.5rem;
-  color: #6c757d;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-.empty-lesion i {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-  color: #adb5bd;
-}
-
-.lesion-item {
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 1.25rem;
-  margin-bottom: 1rem;
-  background-color: #f8f9fa;
-}
-
-.lesion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.lesion-header h4 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #495057;
-}
-
-.add-lesion-btn {
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.form-actions {
-  text-align: center;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e9ecef;
-}
-
-/* ESTILOS PARA LA NUEVA VISTA DE REGISTROS */
+/* ESTILOS PARA LA VISTA DE REGISTROS */
 .registros-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -997,6 +817,70 @@ export default {
   gap: 0.5rem;
 }
 
+/* --- ESTILOS PARA EL MODAL DE DETALLE (Sin cambios) --- */
+.modal-header {
+  background: var(--bg-light, #f8f9fa);
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+.modal-title {
+  color: var(--primary-dark, #0056b3);
+  font-weight: 600;
+}
+.modal-body-detallado {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+}
+.loading-state-modal, .error-state-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: var(--text-gray, #6c757d);
+}
+.detalle-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--primary, #007bff);
+}
+.detalle-header h3 {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.detalle-seccion {
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.detalle-seccion .card-header {
+  font-weight: 600;
+  font-size: 1.1rem;
+  background-color: #f0f3f5;
+  color: var(--text-dark, #343a40);
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+  padding: 0.75rem 1.25rem;
+}
+.detalle-seccion .list-group-item {
+  padding: 0.75rem 1.25rem;
+  background-color: #ffffff;
+}
+.detalle-seccion .list-group-item strong {
+  color: var(--text-dark, #343a40);
+  margin-right: 0.5rem;
+}
+.detalle-seccion .list-group-item p {
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+.modal-footer {
+  background: var(--bg-light, #f8f9fa);
+  border-top: 1px solid var(--border-color, #dee2e6);
+}
+
+
 /* Responsive */
 @media (max-width: 768px) {
   .header-content {
@@ -1007,6 +891,10 @@ export default {
   
   .action-buttons {
     flex-direction: column;
+    align-items: stretch; 
+  }
+  .action-btn {
+    width: 100%; 
   }
   
   .table-footer {
@@ -1023,6 +911,10 @@ export default {
     flex-direction: column;
     gap: 1rem;
     text-align: center;
+  }
+
+  .form-actions {
+    flex-direction: column;
   }
 }
 </style>

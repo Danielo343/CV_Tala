@@ -1,28 +1,28 @@
 <template>
   <div>
     <div class="page-header">
-      <h1 class="page-title">Eventos y Simulacros</h1>
+      <h1 class="page-title">{{ pageTitle }}</h1>
       <div class="page-actions">
-        <button @click="showForm = !showForm" class="btn btn-primary">
-          <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
-          <b>{{ showForm ? 'Ver Lista' : 'Nuevo Evento' }}</b>
+        <button @click="toggleView" class="btn btn-primary">
+          <i :class="showList ? 'fas fa-plus' : 'fas fa-list'"></i>
+          <b>{{ showList ? 'Nuevo Evento' : 'Ver Lista' }}</b>
         </button>
       </div>
     </div>
 
     <div class="main-content">
       <!-- Formulario de Registro -->
-      <div v-if="showForm" class="form-container">
+      <div v-if="!showList" class="form-container">
         <div class="form-header">
-          <h2>Registro de Evento o Simulacro</h2>
+          <h2>{{ isEditing ? 'Editar Evento' : 'Registro de Evento o Simulacro' }}</h2>
           <p class="text-muted">Complete la información del evento especial, simulacro o cobertura.</p>
         </div>
 
-        <div v-if="mensaje" :class="['alert', tipoMensaje]">
+        <div v-if="mensaje" :class="['alert', error ? 'alert-danger' : 'alert-success']">
           {{ mensaje }}
         </div>
 
-        <form @submit.prevent="enviarEvento" class="event-form">
+        <form @submit.prevent="registrarEvento" class="event-form">
           <!-- Información Básica del Evento -->
           <div class="form-section card-light">
             <h3 class="section-title">
@@ -33,20 +33,20 @@
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label">Tipo de Evento *</label>
-                <select v-model="formData.tipo_evento" class="form-select" required @change="onTipoEventoChange">
-                  <option value="">Seleccione el tipo</option>
-                  <option v-for="tipo in tiposEvento" :key="tipo.value" :value="tipo.value">
-                    {{ tipo.text }}
+                <select v-model="formulario.id_tipo_evento" class="form-select" required @change="onTipoEventoChange">
+                  <option :value="null">Seleccione el tipo</option>
+                  <option v-for="tipo in catalogos.tipos_evento" :key="tipo.id" :value="tipo.id">
+                    {{ tipo.nombre }}
                   </option>
                 </select>
               </div>
               
               <div class="col-md-6 mb-3">
-                <label class="form-label">Categoría *</label>
-                <select v-model="formData.categoria" class="form-select" required>
-                  <option value="">Seleccione categoría</option>
-                  <option v-for="cat in categoriasFiltradas" :key="cat.value" :value="cat.value">
-                    {{ cat.text }}
+                <label class="form-label">Categoría</label>
+                <select v-model="formulario.id_categoria" class="form-select">
+                  <option :value="null">Seleccione categoría</option>
+                  <option v-for="cat in categoriasFiltradas" :key="cat.id" :value="cat.id">
+                    {{ cat.nombre }}
                   </option>
                 </select>
               </div>
@@ -57,7 +57,7 @@
                 <label class="form-label">Nombre del Evento *</label>
                 <input 
                   type="text" 
-                  v-model="formData.nombre_evento" 
+                  v-model="formulario.nombre_evento" 
                   class="form-control" 
                   placeholder="Ej: Simulacro de Evacuación Masiva"
                   required
@@ -66,44 +66,54 @@
             </div>
 
             <div class="row">
-              <div class="col-md-6 mb-3">
+              <div class="col-md-4 mb-3">
                 <label class="form-label">Fecha del Evento *</label>
                 <input 
                   type="date" 
-                  v-model="formData.fecha_evento" 
+                  v-model="formulario.fecha" 
                   class="form-control" 
                   required
                 >
               </div>
               
-              <div class="col-md-6 mb-3">
+              <div class="col-md-4 mb-3">
                 <label class="form-label">Hora de Inicio *</label>
                 <input 
                   type="time" 
-                  v-model="formData.hora_inicio" 
+                  v-model="formulario.hora_inicio" 
                   class="form-control" 
                   required
+                >
+              </div>
+              
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Hora de Finalización</label>
+                <input 
+                  type="time" 
+                  v-model="formulario.hora_fin" 
+                  class="form-control"
                 >
               </div>
             </div>
 
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label class="form-label">Hora de Finalización</label>
-                <input 
-                  type="time" 
-                  v-model="formData.hora_fin" 
-                  class="form-control"
-                >
-              </div>
-              
-              <div class="col-md-6 mb-3">
                 <label class="form-label">Estado</label>
-                <select v-model="formData.estado" class="form-select">
+                <select v-model="formulario.estado" class="form-select">
                   <option value="planificado">Planificado</option>
                   <option value="en_curso">En Curso</option>
                   <option value="completado">Completado</option>
                   <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+              
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Responsable</label>
+                <select v-model="formulario.id_responsable" class="form-select">
+                  <option :value="null">Seleccione responsable</option>
+                  <option v-for="usuario in catalogos.personal" :key="usuario.id" :value="usuario.id">
+                    {{ usuario.nombre }}
+                  </option>
                 </select>
               </div>
             </div>
@@ -121,7 +131,7 @@
                 <label class="form-label">Lugar *</label>
                 <input 
                   type="text" 
-                  v-model="formData.lugar" 
+                  v-model="formulario.lugar" 
                   class="form-control" 
                   placeholder="Ej: Estadio Jalisco"
                   required
@@ -132,7 +142,7 @@
                 <label class="form-label">Dirección Completa</label>
                 <input 
                   type="text" 
-                  v-model="formData.direccion" 
+                  v-model="formulario.direccion" 
                   class="form-control" 
                   placeholder="Ej: Av. Las Américas 1234"
                 >
@@ -144,7 +154,7 @@
                 <label class="form-label">Organizador Principal</label>
                 <input 
                   type="text" 
-                  v-model="formData.organizador" 
+                  v-model="formulario.organizador" 
                   class="form-control" 
                   placeholder="Ej: Protección Civil Municipal"
                 >
@@ -154,7 +164,7 @@
                 <label class="form-label">Institución Responsable</label>
                 <input 
                   type="text" 
-                  v-model="formData.institucion_responsable" 
+                  v-model="formulario.institucion_responsable" 
                   class="form-control" 
                   placeholder="Ej: CV Tala"
                 >
@@ -174,7 +184,7 @@
                 <label class="form-label">Número Esperado de Participantes</label>
                 <input 
                   type="number" 
-                  v-model="formData.participantes_esperados" 
+                  v-model="formulario.participantes_esperados" 
                   class="form-control" 
                   placeholder="Ej: 500"
                   min="0"
@@ -185,7 +195,7 @@
                 <label class="form-label">Número de Ambulancias Asignadas</label>
                 <input 
                   type="number" 
-                  v-model="formData.ambulancias_asignadas" 
+                  v-model="formulario.ambulancias_asignadas" 
                   class="form-control" 
                   placeholder="Ej: 3"
                   min="0"
@@ -198,7 +208,7 @@
                 <label class="form-label">Personal Médico Asignado</label>
                 <input 
                   type="number" 
-                  v-model="formData.personal_medico" 
+                  v-model="formulario.personal_medico" 
                   class="form-control" 
                   placeholder="Ej: 8"
                   min="0"
@@ -209,7 +219,7 @@
                 <label class="form-label">Personal de Apoyo</label>
                 <input 
                   type="number" 
-                  v-model="formData.personal_apoyo" 
+                  v-model="formulario.personal_apoyo" 
                   class="form-control" 
                   placeholder="Ej: 12"
                   min="0"
@@ -221,7 +231,7 @@
               <div class="col-md-12 mb-3">
                 <label class="form-label">Objetivos del Evento</label>
                 <textarea 
-                  v-model="formData.objetivos" 
+                  v-model="formulario.objetivos" 
                   class="form-control" 
                   rows="3"
                   placeholder="Describa los objetivos principales del evento..."
@@ -233,7 +243,7 @@
               <div class="col-md-12 mb-3">
                 <label class="form-label">Descripción Detallada</label>
                 <textarea 
-                  v-model="formData.descripcion" 
+                  v-model="formulario.descripcion" 
                   class="form-control" 
                   rows="4"
                   placeholder="Proporcione una descripción completa del evento..."
@@ -242,25 +252,25 @@
             </div>
           </div>
 
-          <!-- Unidad que Atiende -->
+          <!-- Unidades que Atienden -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-ambulance icon-title"></i>
-              Unidad que Atiende
+              Unidades que Atienden
             </h3>
             
             <div class="checkbox-group unidades-grid">
-              <div v-for="unidad in unidadesAtencion" :key="unidad" class="form-check unidad-item">
+              <div v-for="unidad in unidadesAtencion" :key="unidad.value" class="form-check unidad-item">
                 <input 
                   class="form-check-input" 
                   type="checkbox" 
-                  :value="unidad" 
-                  v-model="formData.unidades_atienden" 
-                  :id="'unidad-' + unidad"
+                  :value="unidad.value" 
+                  v-model="formulario.unidades_atienden" 
+                  :id="'unidad-' + unidad.value"
                 >
-                <label class="form-check-label" :for="'unidad-' + unidad">
-                  <span class="unidad-codigo">{{ unidad }}</span>
-                  <span class="unidad-descripcion">{{ getDescripcionUnidad(unidad) }}</span>
+                <label class="form-check-label" :for="'unidad-' + unidad.value">
+                  <span class="unidad-codigo">{{ unidad.value }}</span>
+                  <span class="unidad-descripcion">{{ unidad.descripcion }}</span>
                 </label>
               </div>
             </div>
@@ -269,7 +279,7 @@
               <div class="col-md-12 mb-3">
                 <label class="form-label">Observaciones de las Unidades</label>
                 <textarea 
-                  v-model="formData.observaciones_unidades" 
+                  v-model="formulario.observaciones_unidades" 
                   class="form-control" 
                   rows="2"
                   placeholder="Observaciones adicionales sobre las unidades asignadas..."
@@ -278,16 +288,66 @@
             </div>
           </div>
 
+          <!-- Personal Participante -->
+          <div class="form-section card-light">
+            <h3 class="section-title">
+              <i class="fas fa-users icon-title"></i>
+              Personal Participante
+            </h3>
+            
+            <div class="mb-3">
+              <label class="form-label">Personal Participante (Múltiple Selección)</label>
+              <select v-model="formulario.personal_participante_ids" class="form-select" multiple size="5">
+                <option v-for="usuario in catalogos.personal" :key="usuario.id" :value="usuario.id">
+                  {{ usuario.nombre }}
+                </option>
+              </select>
+              <small class="text-muted">Mantén presionada la tecla Ctrl/Cmd para seleccionar varios.</small>
+            </div>
+          </div>
+
+          <!-- Reporte y Lecciones -->
+          <div class="form-section card-light">
+            <h3 class="section-title">
+              <i class="fas fa-file-alt icon-title"></i>
+              Reporte y Lecciones Aprendidas
+            </h3>
+            
+            <div class="row">
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Observaciones/Reporte</label>
+                <textarea 
+                  v-model="formulario.observaciones" 
+                  class="form-control" 
+                  rows="3"
+                  placeholder="Detalles del evento, incidencias, resultados..."
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Lecciones Aprendidas</label>
+                <textarea 
+                  v-model="formulario.lecciones_aprendidas" 
+                  class="form-control" 
+                  rows="3"
+                  placeholder="Puntos a mejorar, aspectos destacados, recomendaciones..."
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
           <!-- Botones de Acción -->
           <div class="form-actions">
-            <button type="button" @click="cancelarRegistro" class="btn btn-secondary">
+            <button type="button" @click="toggleView" class="btn btn-secondary">
               <i class="fas fa-times me-2"></i>
               Cancelar
             </button>
             
             <button type="submit" class="btn btn-primary" :disabled="enviando">
-              <i class="fas fa-save me-2"></i>
-              {{ enviando ? 'Guardando...' : 'Guardar Evento' }}
+              <i :class="['fas', enviando ? 'fa-spinner fa-spin' : 'fa-save']" class="me-2"></i>
+              {{ isEditing ? (enviando ? 'Actualizando...' : 'Guardar Cambios') : (enviando ? 'Guardando...' : 'Guardar Evento') }}
             </button>
           </div>
         </form>
@@ -305,15 +365,15 @@
               class="form-control search-input"
             >
             <select v-model="filtroTipo" class="form-select filter-select">
-              <option value="">Todos los tipos</option>
-              <option v-for="tipo in tiposEvento" :key="tipo.value" :value="tipo.value">
-                {{ tipo.text }}
+              <option :value="null">Todos los tipos</option>
+              <option v-for="tipo in catalogos.tipos_evento" :key="tipo.id" :value="tipo.id">
+                {{ tipo.nombre }}
               </option>
             </select>
           </div>
         </div>
 
-        <div v-if="cargando" class="text-center py-4">
+        <div v-if="loadingList" class="text-center py-4">
           <i class="fas fa-spinner fa-spin fa-2x"></i>
           <p>Cargando eventos...</p>
         </div>
@@ -331,7 +391,7 @@
             class="evento-card card-shadow"
           >
             <div class="evento-header">
-              <span class="evento-fecha">{{ formatFecha(evento.fecha_evento) }}</span>
+              <span class="evento-fecha">{{ formatFecha(evento.fecha) }}</span>
               <span :class="['evento-badge', `badge-${evento.estado}`]">
                 {{ formatEstado(evento.estado) }}
               </span>
@@ -339,7 +399,7 @@
             
             <div class="evento-body">
               <h5 class="evento-titulo">{{ evento.nombre_evento }}</h5>
-              <p class="evento-tipo">{{ getTipoTexto(evento.tipo_evento) }}</p>
+              <p class="evento-tipo">{{ getTipoEvento(evento.id_tipo_evento) }}</p>
               <p class="evento-descripcion">{{ evento.descripcion }}</p>
               
               <div class="evento-info">
@@ -366,10 +426,10 @@
               <button class="btn btn-sm btn-outline-primary">
                 <i class="fas fa-eye me-1"></i>Ver
               </button>
-              <button class="btn btn-sm btn-outline-secondary">
+              <button @click="editarEvento(evento)" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-edit me-1"></i>Editar
               </button>
-              <button class="btn btn-sm btn-outline-danger">
+              <button @click="eliminarEvento(evento)" class="btn btn-sm btn-outline-danger">
                 <i class="fas fa-trash me-1"></i>Eliminar
               </button>
             </div>
@@ -381,167 +441,78 @@
 </template>
 
 <script>
+import { ref, onMounted, computed } from 'vue';
+import api from '@/services/api';
+
 export default {
   name: 'EventosView',
-  data() {
-    return {
-      showForm: false,
-      enviando: false,
-      cargando: false,
-      mensaje: '',
-      tipoMensaje: '',
-      filtroBusqueda: '',
-      filtroTipo: '',
-      eventos: [],
-      formData: {
-        tipo_evento: '',
-        categoria: '',
-        nombre_evento: '',
-        fecha_evento: '',
-        hora_inicio: '',
-        hora_fin: '',
-        estado: 'planificado',
-        lugar: '',
-        direccion: '',
-        organizador: '',
-        institucion_responsable: '',
-        participantes_esperados: null,
-        ambulancias_asignadas: null,
-        personal_medico: null,
-        personal_apoyo: null,
-        objetivos: '',
-        descripcion: '',
-        unidades_atienden: [],
-        observaciones_unidades: ''
-      },
-      tiposEvento: [
-        { value: 'simulacro', text: 'Simulacro' },
-        { value: 'evento_masivo', text: 'Evento Masivo' },
-        { value: 'deportivo', text: 'Evento Deportivo' },
-        { value: 'cultural', text: 'Evento Cultural' },
-        { value: 'capacitacion', text: 'Capacitación' },
-        { value: 'cobertura', text: 'Cobertura Especial' },
-        { value: 'otro', text: 'Otro' }
-      ],
-      categorias: [
-        { value: 'evacuacion', text: 'Evacuación', tipos: ['simulacro'] },
-        { value: 'incendio', text: 'Incendio', tipos: ['simulacro'] },
-        { value: 'sismo', text: 'Sismo', tipos: ['simulacro'] },
-        { value: 'inundacion', text: 'Inundación', tipos: ['simulacro'] },
-        { value: 'materiales_peligrosos', text: 'Materiales Peligrosos', tipos: ['simulacro'] },
-        { value: 'concierto', text: 'Concierto', tipos: ['evento_masivo', 'cultural'] },
-        { value: 'feria', text: 'Feria', tipos: ['evento_masivo', 'cultural'] },
-        { value: 'festival', text: 'Festival', tipos: ['evento_masivo', 'cultural'] },
-        { value: 'futbol', text: 'Fútbol', tipos: ['deportivo'] },
-        { value: 'maraton', text: 'Maratón', tipos: ['deportivo'] },
-        { value: 'ciclismo', text: 'Ciclismo', tipos: ['deportivo'] },
-        { value: 'primeros_auxilios', text: 'Primeros Auxilios', tipos: ['capacitacion'] },
-        { value: 'rescate', text: 'Rescate', tipos: ['capacitacion'] },
-        { value: 'proteccion_civil', text: 'Protección Civil', tipos: ['cobertura'] },
-        { value: 'seguridad_publica', text: 'Seguridad Pública', tipos: ['cobertura'] },
-        { value: 'otro', text: 'Otro', tipos: ['otro'] }
-      ],
-      unidadesAtencion: ['SM01', 'SM02', 'SM03', 'SM04', 'SM05', 'B2', 'M6', 'M7']
-    }
-  },
-  computed: {
-    categoriasFiltradas() {
-      if (!this.formData.tipo_evento) {
-        return this.categorias;
+  setup() {
+    const showList = ref(true);
+    const isEditing = ref(false);
+    const loadingList = ref(true);
+    const enviando = ref(false);
+    const eventos = ref([]);
+    const catalogos = ref({
+      tipos_evento: [],
+      categorias: [],
+      personal: [],
+      unidades_transporte: []
+    });
+    const formulario = ref(resetFormularioState());
+    const mensaje = ref('');
+    const error = ref(false);
+    const filtroBusqueda = ref('');
+    const filtroTipo = ref(null);
+
+    const unidadesAtencion = computed(() => {
+        return (catalogos.value.unidades_transporte || []).map(u => ({
+            value: u.codigo,
+            descripcion: u.descripcion
+        }));
+    });
+
+    const pageTitle = computed(() => (showList.value 
+        ? 'Eventos y Simulacros' 
+        : (isEditing.value ? 'Editar Evento' : 'Nuevo Registro de Evento')
+    ));
+
+    const categoriasFiltradas = computed(() => {
+      if (!formulario.value.id_tipo_evento) {
+        return catalogos.value.categorias || [];
       }
-      return this.categorias.filter(cat => 
-        cat.tipos.includes(this.formData.tipo_evento) || cat.tipos.includes('otro')
+      return (catalogos.value.categorias || []).filter(cat => 
+        cat.id_tipo_evento == formulario.value.id_tipo_evento
       );
-    },
-    eventosFiltrados() {
-      let filtered = this.eventos;
+    });
+
+    const eventosFiltrados = computed(() => {
+      let filtered = eventos.value;
       
-      if (this.filtroBusqueda) {
-        const search = this.filtroBusqueda.toLowerCase();
+      if (filtroBusqueda.value) {
+        const search = filtroBusqueda.value.toLowerCase();
         filtered = filtered.filter(evento => 
           evento.nombre_evento.toLowerCase().includes(search) ||
-          evento.descripcion.toLowerCase().includes(search) ||
-          evento.lugar.toLowerCase().includes(search)
+          (evento.descripcion && evento.descripcion.toLowerCase().includes(search)) ||
+          (evento.lugar && evento.lugar.toLowerCase().includes(search))
         );
       }
       
-      if (this.filtroTipo) {
-        filtered = filtered.filter(evento => evento.tipo_evento === this.filtroTipo);
+      if (filtroTipo.value) {
+        filtered = filtered.filter(evento => evento.id_tipo_evento == filtroTipo.value);
       }
       
       return filtered;
-    }
-  },
-  methods: {
-    getDescripcionUnidad(codigo) {
-      const descripciones = {
-        'SM01': 'Unidad de Soporte Médico 01',
-        'SM02': 'Unidad de Soporte Médico 02',
-        'SM03': 'Unidad de Soporte Médico 03',
-        'SM04': 'Unidad de Soporte Médico 04',
-        'SM05': 'Unidad de Soporte Médico 05',
-        'B2': 'Unidad de Bomberos 2',
-        'M6': 'Unidad Móvil 6',
-        'M7': 'Unidad Móvil 7'
-      };
-      return descripciones[codigo] || 'Unidad de Atención';
-    },
-    
-    onTipoEventoChange() {
-      // Reset categoria cuando cambia el tipo
-      this.formData.categoria = '';
-    },
-    
-    async enviarEvento() {
-      this.enviando = true;
-      
-      try {
-        // Simular envío a API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Aquí iría la llamada real a la API
-        // await api.post('/eventos', this.formData);
-        
-        this.mensaje = 'Evento registrado exitosamente! ✅';
-        this.tipoMensaje = 'alert-success';
-        
-        // Agregar a la lista local (en producción vendría de la API)
-        const nuevoEvento = {
-          id: Date.now(),
-          ...this.formData
-        };
-        this.eventos.unshift(nuevoEvento);
-        
-        this.resetForm();
-        
-        setTimeout(() => {
-          this.showForm = false;
-          this.mensaje = '';
-        }, 3000);
-        
-      } catch (error) {
-        console.error('Error al guardar evento:', error);
-        this.mensaje = 'Error al guardar el evento. Intente nuevamente. ❌';
-        this.tipoMensaje = 'alert-danger';
-      } finally {
-        this.enviando = false;
-      }
-    },
-    
-    cancelarRegistro() {
-      this.resetForm();
-      this.showForm = false;
-      this.mensaje = '';
-    },
-    
-    resetForm() {
-      this.formData = {
-        tipo_evento: '',
-        categoria: '',
+    });
+
+    function resetFormularioState() {
+      return {
+        id: null,
         nombre_evento: '',
-        fecha_evento: '',
-        hora_inicio: '',
-        hora_fin: '',
+        id_tipo_evento: null,
+        id_categoria: null,
+        fecha: new Date().toISOString().split('T')[0],
+        hora_inicio: '08:00',
+        hora_fin: '17:00',
         estado: 'planificado',
         lugar: '',
         direccion: '',
@@ -553,20 +524,216 @@ export default {
         personal_apoyo: null,
         objetivos: '',
         descripcion: '',
+        id_responsable: null,
+        observaciones: '',
+        lecciones_aprendidas: '',
         unidades_atienden: [],
+        personal_participante_ids: [],
         observaciones_unidades: ''
       };
-    },
-    
-    formatFecha(fecha) {
+    }
+
+    const getPayload = () => {
+        const payload = { ...formulario.value };
+        
+        // Convertir strings vacíos a null
+        const camposAConvertirNull = [
+          'direccion', 'organizador', 'institucion_responsable', 
+          'objetivos', 'descripcion', 'observaciones', 
+          'lecciones_aprendidas', 'observaciones_unidades',
+          'id_categoria', 'id_responsable'
+        ];
+        
+        for (const key of camposAConvertirNull) {
+            if (payload[key] === '' || payload[key] === undefined) {
+                payload[key] = null;
+            }
+        }
+
+        // Asegurar que los campos numéricos sean null si están vacíos
+        const camposNumericos = [
+          'participantes_esperados', 'ambulancias_asignadas', 
+          'personal_medico', 'personal_apoyo'
+        ];
+        
+        for (const key of camposNumericos) {
+            if (payload[key] === '' || payload[key] === undefined) {
+                payload[key] = null;
+            }
+        }
+        
+        return payload;
+    };
+
+    const toggleView = () => {
+      showList.value = !showList.value;
+      if (showList.value) {
+        fetchEventos();
+        isEditing.value = false;
+      } else {
+        mensaje.value = '';
+        error.value = false;
+        if (!isEditing.value) {
+            formulario.value = resetFormularioState();
+        }
+      }
+    };
+
+    const onTipoEventoChange = () => {
+      formulario.value.id_categoria = null;
+    };
+
+    const fetchCatalogos = async () => {
+      loadingList.value = true;
+      try {
+        const res = await api.get('/catalogos');
+        const d = res.data || {};
+        
+        // Agregar fallbacks para cada propiedad
+        catalogos.value.tipos_evento = d.tipos_evento || [];
+        catalogos.value.categorias = d.categorias || [];
+        catalogos.value.personal = d.personal || [];
+        catalogos.value.unidades_transporte = d.unidades_transporte || [];
+        
+      } catch (err) {
+        console.error('Error cargando catálogos', err);
+        mensaje.value = 'No se pudieron cargar las listas de catálogos.';
+        error.value = true;
+        
+        // Inicializar arrays vacíos para evitar errores
+        catalogos.value.tipos_evento = [];
+        catalogos.value.categorias = [];
+        catalogos.value.personal = [];
+        catalogos.value.unidades_transporte = [];
+      } finally {
+          loadingList.value = false; 
+      }
+    };
+
+    const fetchEventos = async () => {
+      loadingList.value = true;
+      try {
+        const res = await api.get('/eventos'); 
+        eventos.value = res.data || [];
+      } catch (err) {
+        console.error('Error cargando eventos', err);
+        eventos.value = [];
+      } finally {
+        loadingList.value = false;
+      }
+    };
+
+    const editarEvento = async (evento) => {
+        try {
+            const res = await api.get(`/eventos/${evento.id}`);
+            const eventoCompleto = res.data;
+
+            formulario.value = {
+                ...eventoCompleto,
+                id_tipo_evento: eventoCompleto.id_tipo_evento || null,
+                id_categoria: eventoCompleto.id_categoria || null,
+                id_responsable: eventoCompleto.id_responsable || null,
+                participantes_esperados: eventoCompleto.participantes_esperados === null ? null : Number(eventoCompleto.participantes_esperados),
+                ambulancias_asignadas: eventoCompleto.ambulancias_asignadas === null ? null : Number(eventoCompleto.ambulancias_asignadas),
+                personal_medico: eventoCompleto.personal_medico === null ? null : Number(eventoCompleto.personal_medico),
+                personal_apoyo: eventoCompleto.personal_apoyo === null ? null : Number(eventoCompleto.personal_apoyo),
+                unidades_atienden: eventoCompleto.unidades_atienden || [],
+                personal_participante_ids: eventoCompleto.personal_participante_ids || [],
+            };
+            
+            isEditing.value = true;
+            showList.value = false;
+            mensaje.value = '';
+            error.value = false;
+
+        } catch (err) {
+            console.error('Error al cargar detalles del evento:', err);
+            mensaje.value = 'Error al cargar los datos del evento para edición.';
+            error.value = true;
+        }
+    };
+
+    const actualizarEvento = async () => {
+        enviando.value = true;
+        mensaje.value = '';
+        error.value = false;
+        const payload = getPayload(); 
+        
+        try {
+            const resp = await api.put(`/eventos/${payload.id}`, payload);
+            mensaje.value = `Evento "${resp.data.data.nombre_evento}" actualizado exitosamente.`;
+            error.value = false;
+            
+            setTimeout(() => {
+              toggleView();
+            }, 2000);
+
+        } catch (err) {
+            const errorMsg = err.response?.data?.error || 'Verifique que los campos obligatorios estén completos.';
+            mensaje.value = `Error al actualizar el evento: ${errorMsg}`;
+            error.value = true;
+            console.error(err);
+        } finally {
+            enviando.value = false;
+        }
+    }
+
+    const registrarEvento = async () => {
+        if (isEditing.value) {
+            await actualizarEvento();
+        } else {
+            enviando.value = true;
+            mensaje.value = '';
+            error.value = false;
+            const payload = getPayload(); 
+
+            try {
+                const resp = await api.post('/eventos', payload);
+                mensaje.value = `Evento "${resp.data.data.nombre_evento}" guardado exitosamente.`;
+                error.value = false;
+                
+                setTimeout(() => {
+                    toggleView();
+                }, 2000);
+
+            } catch (err) {
+                const errorMsg = err.response?.data?.error || 'Verifique que los campos obligatorios estén completos.';
+                mensaje.value = `Error al guardar el evento: ${errorMsg}`;
+                error.value = true;
+                console.error(err);
+            } finally {
+                enviando.value = false;
+            }
+        }
+    };
+
+    const eliminarEvento = async (evento) => {
+        if (!confirm(`¿Está seguro de que desea eliminar el evento "${evento.nombre_evento}"? Esta acción es irreversible.`)) {
+            return;
+        }
+
+        try {
+            await api.delete(`/eventos/${evento.id}`);
+            
+            alert(`Evento "${evento.nombre_evento}" eliminado exitosamente.`);
+
+            await fetchEventos(); 
+
+        } catch (err) {
+            console.error('Error al eliminar el evento:', err);
+            alert('Error al eliminar el evento. Intente de nuevo.');
+        }
+    };
+
+    const formatFecha = (fecha) => {
       return new Date(fecha).toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
-    },
-    
-    formatEstado(estado) {
+    };
+
+    const formatEstado = (estado) => {
       const estados = {
         planificado: 'Planificado',
         en_curso: 'En Curso',
@@ -574,49 +741,43 @@ export default {
         cancelado: 'Cancelado'
       };
       return estados[estado] || estado;
-    },
-    
-    getTipoTexto(tipo) {
-      const tipoObj = this.tiposEvento.find(t => t.value === tipo);
-      return tipoObj ? tipoObj.text : tipo;
-    },
-    
-    cargarEventos() {
-      // Simular carga de eventos
-      this.cargando = true;
-      setTimeout(() => {
-        this.eventos = [
-          {
-            id: 1,
-            tipo_evento: 'simulacro',
-            nombre_evento: 'Simulacro de Evacuación por Sismo',
-            fecha_evento: '2024-01-15',
-            hora_inicio: '09:00',
-            estado: 'completado',
-            lugar: 'Plaza Central',
-            descripcion: 'Simulacro de evacuación masiva por sismo de magnitud 7.5',
-            participantes_esperados: 1500,
-            unidades_atienden: ['SM01', 'SM03', 'B2']
-          },
-          {
-            id: 2,
-            tipo_evento: 'deportivo',
-            nombre_evento: 'Maratón Anual Ciudad',
-            fecha_evento: '2024-02-20',
-            hora_inicio: '07:00',
-            estado: 'planificado',
-            lugar: 'Parque Metropolitano',
-            descripcion: 'Maratón anual con participación de 3000 corredores',
-            participantes_esperados: 3000,
-            unidades_atienden: ['SM02', 'SM04', 'M6', 'M7']
-          }
-        ];
-        this.cargando = false;
-      }, 1000);
-    }
-  },
-  mounted() {
-    this.cargarEventos();
+    };
+
+    const getTipoEvento = (idTipo) => {
+      const tipo = catalogos.value.tipos_evento.find(t => t.id == idTipo);
+      return tipo ? tipo.nombre : 'Sin tipo';
+    };
+
+    onMounted(() => {
+      fetchCatalogos();
+      fetchEventos();
+    });
+
+    return {
+      showList,
+      isEditing,
+      pageTitle,
+      toggleView,
+      catalogos,
+      formulario,
+      eventos,
+      loadingList,
+      enviando,
+      mensaje,
+      error,
+      filtroBusqueda,
+      filtroTipo,
+      unidadesAtencion,
+      categoriasFiltradas,
+      eventosFiltrados,
+      registrarEvento,
+      editarEvento,
+      eliminarEvento, 
+      onTipoEventoChange,
+      formatFecha,
+      formatEstado,
+      getTipoEvento
+    };
   }
 }
 </script>
@@ -818,6 +979,28 @@ export default {
 
 .btn-outline-primary:hover {
   background: #007bff;
+  color: white;
+}
+
+.btn-outline-secondary {
+  background: transparent;
+  border: 1px solid #6c757d;
+  color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-outline-danger {
+  background: transparent;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+  background: #dc3545;
   color: white;
 }
 
@@ -1051,7 +1234,7 @@ export default {
   margin: 0 -0.75rem;
 }
 
-.col-md-6, .col-md-12 {
+.col-md-6, .col-md-12, .col-md-4 {
   padding: 0 0.75rem;
   flex: 1 0 0%;
 }
@@ -1059,6 +1242,11 @@ export default {
 .col-md-6 {
   flex: 0 0 50%;
   max-width: 50%;
+}
+
+.col-md-4 {
+  flex: 0 0 33.333333%;
+  max-width: 33.333333%;
 }
 
 .col-md-12 {
@@ -1091,7 +1279,7 @@ export default {
     flex-direction: column;
   }
   
-  .col-md-6 {
+  .col-md-6, .col-md-4 {
     flex: 0 0 100%;
     max-width: 100%;
   }

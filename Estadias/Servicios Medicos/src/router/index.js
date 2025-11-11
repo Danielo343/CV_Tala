@@ -2,10 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 
-// Importamos nuestros dos módulos principales
+// Importamos nuestros módulos principales
 import RegistroPrehospitalario from '@/views/modules/RegistroPrehospitalario.vue'
-import ConsultasView from '@/views/modules/ConsultasView.vue' // <-- AÑADIDO
-import EventosView from '@/views/modules/EventosView.vue' // <-- AÑADIDO
+import ConsultasView from '@/views/modules/ConsultasView.vue'
+import EventosView from '@/views/modules/EventosView.vue'
 
 const routes = [
   {
@@ -13,6 +13,7 @@ const routes = [
     name: 'Login',
     component: LoginView,
   },
+  
   {
     path: '/',
     component: DashboardView,
@@ -26,15 +27,22 @@ const routes = [
       {
         path: 'consultas', // La ruta "/consultas"
         name: 'Consultas',
-        component: ConsultasView // <-- AÑADIDO
+        component: ConsultasView
       },
-            {
+      {
         path: 'eventos', // La ruta "/eventos"
         name: 'Eventos',
-        component: EventosView // <-- AÑADIDO
-      },
-
+        component: EventosView
+      }
     ]
+  },
+  // Ruta separada para edición completa (fuera del Dashboard)
+  {
+    path: '/editar-registro/:id',
+    name: 'EditarRegistro',
+    component: () => import('@/views/modules/EditarRegistroView.vue'), // <-- CORREGIDO
+    props: true,
+    meta: { requiresAuth: true }
   }
 ]
 
