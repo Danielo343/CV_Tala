@@ -3,7 +3,7 @@
     <div class="page-header">
       <h1 class="page-title">{{ pageTitle }}</h1>
       <div class="page-actions">
-        <button @click="abrirModalNuevo" class="btn btn-primary">
+        <button @click="showForm ? toggleFormVisibility() : abrirModalNuevo()" class="btn btn-primary">
           <i :class="showForm ? 'fas fa-list' : 'fas fa-plus'"></i>
           <b class="ms-2">{{ showForm ? 'Ver Registros del Día' : 'Nuevo Registro' }}</b>
         </button>

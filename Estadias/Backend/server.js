@@ -1,19 +1,19 @@
-// 1. Importaciones
+// 1. Importaciones (Sin cambios)
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
-const { diff } = require('deep-diff'); // <-- ¡AQUÍ ESTÁ LA LIBRERÍA QUE INSTALASTE!
+const { diff } = require('deep-diff');
 require('dotenv').config();
 
-// 2. Configuración del Servidor
+// 2. Configuración del Servidor (Sin cambios)
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// 3. Conexión a la Base de Datos PostgreSQL
+// 3. Conexión a la Base de Datos PostgreSQL (Sin cambios)
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -26,8 +26,94 @@ pool.query('SELECT NOW()', (err, res) => {
   else console.log('🚀 Conectado a la base de datos PostgreSQL en:', res.rows[0].now);
 });
 
+
+// --- 👇 ¡NUEVO! CACHÉ DE CATÁLOGOS 👇 ---
+
+let catalogCache = null;
+
+/**
+ * Carga todos los catálogos de la BD a una caché en memoria
+ * para traducir IDs a Nombres en el historial de actividad.
+ */
+async function getCatalogos() {
+  if (catalogCache) {
+    return catalogCache;
+  }
+
+  console.log('Cargando catálogos en caché...');
+  try {
+    const [
+      tipos_activacion, causa_clinica, agentes_causantes,
+      causas_traumaticas, unidades, estados_traslado,
+      estados_pupilas, estados_piel, tipos_lesion, ubicaciones_lesion,
+      tipos_evento, categorias_evento, personal
+    ] = await Promise.all([
+      pool.query('SELECT * FROM tipo_activacion ORDER BY id'),
+      pool.query('SELECT * FROM causa_clinica ORDER BY id'),
+      pool.query('SELECT * FROM agente_causante_general ORDER BY id'),
+      pool.query('SELECT * FROM causa_traumatica_especifica ORDER BY id'),
+      pool.query('SELECT * FROM unidad_asignada ORDER BY id'),
+      pool.query('SELECT * FROM estado_traslado ORDER BY id'),
+      pool.query('SELECT * FROM estado_pupilas ORDER BY id'),
+      pool.query('SELECT * FROM estado_piel ORDER BY id'),
+      pool.query('SELECT * FROM tipo_lesion ORDER BY id'),
+      pool.query('SELECT * FROM ubicacion_lesion ORDER BY id'),
+      pool.query('SELECT * FROM tipo_evento ORDER BY id'),
+      pool.query('SELECT * FROM categoria_evento ORDER BY id'),
+      pool.query('SELECT id, nombre_completo AS nombre FROM usuarios ORDER BY nombre_completo'),
+    ]);
+
+    // Función helper para crear un Map (ej: '1' -> 'Accidente')
+    const createMap = (rows) => new Map(rows.map(row => [String(row.id), row.nombre]));
+
+    catalogCache = {
+      // Guardamos las listas completas por si las necesitamos
+      listas: {
+        tipos_activacion: tipos_activacion.rows,
+        causa_clinica: causa_clinica.rows,
+        agentes_causantes: agentes_causantes.rows,
+        causas_traumaticas: causas_traumaticas.rows,
+        unidades: unidades.rows, // para id_unidad_asignada
+        estados_traslado: estados_traslado.rows,
+        estados_pupilas: estados_pupilas.rows,
+        estados_piel: estados_piel.rows,
+        tipos_lesion: tipos_lesion.rows,
+        ubicaciones_lesion: ubicaciones_lesion.rows,
+        tipos_evento: tipos_evento.rows,
+        categorias: categorias_evento.rows,
+        personal: personal.rows,
+      },
+      // Creamos Mapas para búsqueda rápida de IDs
+      maps: {
+        id_tipo_activacion: createMap(tipos_activacion.rows),
+        id_causa_clinica: createMap(causa_clinica.rows),
+        id_unidad_asignada: createMap(unidades.rows),
+        id_agente_causante_general: createMap(agentes_causantes.rows),
+        id_estado_traslado: createMap(estados_traslado.rows),
+        id_estado_pupilas: createMap(estados_pupilas.rows),
+        id_estado_piel: createMap(estados_piel.rows),
+        id_tipo_lesion: createMap(tipos_lesion.rows),
+        id_ubicacion_lesion: createMap(ubicaciones_lesion.rows),
+        id_tipo_evento: createMap(tipos_evento.rows),
+        id_categoria: createMap(categorias_evento.rows),
+        id_responsable: createMap(personal.rows),
+      }
+    };
+
+    console.log('Catálogos cargados exitosamente en caché.');
+    return catalogCache;
+  } catch (err) {
+    console.error('Error fatal al cargar catálogos en caché:', err);
+    return null; // Retorna null si falla
+  }
+}
+
+// --- 👆 FIN CACHÉ DE CATÁLOGOS 👆 ---
+
+
 // 4. Autenticación (Sin cambios)
 app.post('/api/auth/login', async (req, res) => {
+    // ... (tu código de login no cambia)
     const { username, password } = req.body;
     console.log(`\n--- Intento de Login ---`);
     console.log(`Usuario recibido: ${username}`);
@@ -72,8 +158,9 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// --- 5. Middlewares de Seguridad (Sin cambios) ---
+// 5. Middlewares de Seguridad (Sin cambios)
 const verificarToken = (req, res, next) => {
+    // ... (tu código de verificarToken no cambia)
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
     if (token == null) {
@@ -89,7 +176,7 @@ const verificarToken = (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-    // Tu BD usa 'admin' y 'usuario'
+    // ... (tu código de adminOnly no cambia)
     if (req.user && req.user.rol === 'admin') {
         next();
     } else {
@@ -105,7 +192,6 @@ const registrarHistorial = async (id_usuario, nombre_usuario, accion, tipo_entid
         (id_usuario, nombre_usuario, accion, tipo_entidad, id_entidad, detalles)
       VALUES ($1, $2, $3, $4, $5, $6)
     `;
-    // Asegurarnos de que id_usuario no sea nulo (ej. en un error muy temprano)
     const userId = id_usuario || null;
     const userName = nombre_usuario || 'Sistema';
 
@@ -116,49 +202,76 @@ const registrarHistorial = async (id_usuario, nombre_usuario, accion, tipo_entid
   }
 };
 
-// --- ¡NUEVO! FUNCIÓN HELPER PARA COMPARAR CAMBIOS ---
+
+// --- 👇 ¡FUNCIÓN HELPER DE COMPARACIÓN ACTUALIZADA! 👇 ---
 /**
- * Compara dos objetos y genera un string con los cambios.
+ * Compara dos objetos y genera un string con los cambios, traduciendo IDs.
  * @param {object} antiguo - El objeto ANTES de la actualización (de la BD).
  * @param {object} nuevo - El objeto (req.body) con los datos NUEVOS.
- * @returns {string} - Un string describiendo los cambios (ej: "Cambió rol: 'usuario' -> 'admin'")
+ * @param {object} catalogMaps - El objeto de Mapas de la caché de catálogos.
+ * @returns {string} - Un string describiendo los cambios (ej: "Cambió Rol: 'usuario' -> 'admin'")
  */
-const generarDetalleDeCambios = (antiguo, nuevo) => {
-  // Filtramos 'nuevo' para que solo contenga claves que existen en 'antiguo'
-  // Esto evita que 'deep-diff' reporte la creación de claves que no son de la BD (como 'password')
+const generarDetalleDeCambios = (antiguo, nuevo, catalogMaps) => {
   const nuevoFiltrado = {};
+  
+  // Mapeo de campos de BD a nombres legibles
+  const nombresCampos = {
+    nombre_completo: 'Nombre Completo',
+    nombre_usuario: 'Usuario',
+    rol: 'Rol',
+    email: 'Email',
+    // --- Campos de Activación ---
+    fecha_activacion: 'Fecha Activación',
+    hora_activacion: 'Hora Activación',
+    paciente_nombre: 'Paciente',
+    paciente_edad: 'Edad',
+    paciente_sexo: 'Sexo',
+    hospital_destino: 'Hospital',
+    id_tipo_activacion: 'Tipo Activación',
+    id_unidad_asignada: 'Unidad Asignada',
+    id_causa_clinica: 'Causa Clínica',
+    id_agente_causante_general: 'Agente Causal',
+    id_estado_traslado: 'Estado Traslado',
+    // --- Campos de Evento ---
+    nombre_evento: 'Nombre Evento',
+    fecha: 'Fecha Evento',
+    estado: 'Estado',
+    lugar: 'Lugar',
+    id_tipo_evento: 'Tipo Evento',
+    id_categoria: 'Categoría',
+    id_responsable: 'Responsable'
+  };
+
   Object.keys(antiguo).forEach(key => {
-    // Usamos hasOwnProperty para asegurarnos de que la propiedad viene en el body
-    // y no es heredada
     if (nuevo.hasOwnProperty(key)) { 
-      
-      // Normalización de valores para comparación
       let valorAntiguo = antiguo[key];
       let valorNuevo = nuevo[key];
 
-      // 1. Tratar null/undefined/"" como equivalentes para no ensuciar el log
+      // --- Normalización de Fechas ---
+      if (valorAntiguo instanceof Date) {
+        // Convertimos la fecha de la BD a 'YYYY-MM-DD'
+        valorAntiguo = valorAntiguo.toISOString().split('T')[0];
+      }
+      if (key === 'fecha_activacion' || key === 'fecha') {
+          if (typeof valorNuevo === 'string' && valorNuevo.includes('T')) {
+               valorNuevo = valorNuevo.split('T')[0];
+          }
+      }
+      
+      // --- Normalización de Nulos/Strings/Números ---
       if (valorAntiguo === null || valorAntiguo === undefined) valorAntiguo = "";
       if (valorNuevo === null || valorNuevo === undefined) valorNuevo = "";
       
-      // 2. Convertir números a string para comparar '123' con 123
-      valorAntiguo = String(valorAntiguo);
-      valorNuevo = String(valorNuevo);
+      valorAntiguo = String(valorAntiguo).trim();
+      valorNuevo = String(valorNuevo).trim();
 
-      // 3. Trimear strings
-      if (typeof valorAntiguo === 'string') valorAntiguo = valorAntiguo.trim();
-      if (typeof valorNuevo === 'string') valorNuevo = valorNuevo.trim();
-
-      // Solo añadimos al objeto filtrado si realmente son diferentes
       if (valorAntiguo !== valorNuevo) {
-        nuevoFiltrado[key] = nuevo[key]; // Usamos el valor original de 'nuevo'
+        nuevoFiltrado[key] = nuevo[key]; 
       } else {
-        // Si son iguales (ej. 123 vs '123' o null vs ''),
-        // ponemos el valor antiguo en 'nuevoFiltrado' para que deep-diff los vea iguales.
         nuevoFiltrado[key] = antiguo[key];
       }
     }
   });
-
 
   const diferencias = diff(antiguo, nuevoFiltrado);
   const cambios = [];
@@ -167,37 +280,47 @@ const generarDetalleDeCambios = (antiguo, nuevo) => {
     return "(Sin cambios detectados)";
   }
 
-  // Mapear campos de la BD a nombres amigables
-  const nombresCampos = {
-    nombre_completo: 'Nombre Completo',
-    nombre_usuario: 'Usuario',
-    rol: 'Rol',
-    email: 'Email',
-    fecha_activacion: 'Fecha Activación',
-    hora_activacion: 'Hora Activación',
-    paciente_nombre: 'Paciente',
-    paciente_edad: 'Edad',
-    paciente_sexo: 'Sexo',
-    hospital_destino: 'Hospital',
-    nombre_evento: 'Nombre Evento',
-    fecha: 'Fecha Evento',
-    estado: 'Estado',
-    lugar: 'Lugar',
-    // ... puedes añadir más traducciones si quieres
-  };
-
   diferencias.forEach(d => {
     // Solo nos interesan las ediciones (kind: 'E')
     if (d.kind === 'E') {
       const campo = d.path.join('.');
       const nombreAmigable = nombresCampos[campo] || campo; 
       
-      const valorAntiguo = d.lhs === null || d.lhs === undefined || d.lhs === '' ? '(vacío)' : `'${d.lhs}'`;
-      const valorNuevo = d.rhs === null || d.rhs === undefined || d.rhs === '' ? '(vacío)' : `'${d.rhs}'`;
+      let valorAntiguoStr = d.lhs;
+      let valorNuevoStr = d.rhs;
 
-      // Evitar registrar cambios de 'id' o 'contrasena_hash'
-      if (campo !== 'id' && campo !== 'contrasena_hash' && campo !== 'fecha_captura' && campo !== 'hora_captura') {
-        cambios.push(`${nombreAmigable}: ${valorAntiguo} -> ${valorNuevo}`);
+      // --- ¡AQUÍ ESTÁ LA MAGIA! ---
+      // Si el campo es un ID y tenemos su mapa, lo traducimos
+      if (catalogMaps && catalogMaps[campo]) {
+        const map = catalogMaps[campo];
+        valorAntiguoStr = map.get(String(d.lhs)) || `(ID: ${d.lhs})`; // Fallback al ID
+        valorNuevoStr = map.get(String(d.rhs)) || `(ID: ${d.rhs})`; // Fallback al ID
+      } 
+      // --- Formateo especial para fechas ---
+      else if (campo === 'fecha_activacion' || campo === 'fecha') {
+          try {
+            // Intenta formatear las fechas a un formato legible
+            valorAntiguoStr = new Date(d.lhs).toLocaleDateString('es-MX', { timeZone: 'UTC' });
+            valorNuevoStr = new Date(d.rhs).toLocaleDateString('es-MX', { timeZone: 'UTC' });
+          } catch (e) { /* se queda como string si falla */ }
+      }
+      // --- FIN DE LA MAGIA ---
+
+      // Función interna para formatear valores vacíos
+      const formatValor = (val) => {
+         if (val === null || val === undefined || val === '' || String(val).startsWith('(ID: undefined)') || String(val).startsWith('(ID: null)')) return '(vacío)';
+         return `'${val}'`;
+      };
+      
+      const valorAntiguoFmt = formatValor(valorAntiguoStr);
+      const valorNuevoFmt = formatValor(valorNuevoStr);
+
+      // Evitar registrar campos sensibles o irrelevantes
+      const camposIgnorados = ['id', 'contrasena_hash', 'fecha_captura', 'hora_captura', 'num_reporte_local'];
+      if (!camposIgnorados.includes(campo)) {
+         if (valorAntiguoFmt !== valorNuevoFmt) {
+            cambios.push(`${nombreAmigable}: ${valorAntiguoFmt} -> ${valorNuevoFmt}`);
+         }
       }
     }
   });
@@ -208,49 +331,35 @@ const generarDetalleDeCambios = (antiguo, nuevo) => {
   
   return cambios.join(', ');
 };
-// --- FIN FUNCIÓN HELPER DE COMPARACIÓN ---
+// --- 👆 FIN FUNCIÓN HELPER DE COMPARACIÓN 👆 ---
 
 
-// 6. Endpoint de Catálogos (Sin cambios)
+// 6. Endpoint de Catálogos
 app.get('/api/catalogos', verificarToken, async (req, res) => {
   try {
-    const [
-      tipos_activacion, causa_clinica, agentes_causantes,
-      causas_traumaticas, unidades, estados_traslado,
-      estados_pupilas, estados_piel, tipos_lesion, ubicaciones_lesion,
-      tipos_evento, categorias_evento, personal, unidades_transporte
-    ] = await Promise.all([
-      pool.query('SELECT * FROM tipo_activacion ORDER BY id'),
-      pool.query('SELECT * FROM causa_clinica ORDER BY id'),
-      pool.query('SELECT * FROM agente_causante_general ORDER BY id'),
-      pool.query('SELECT * FROM causa_traumatica_especifica ORDER BY id'),
-      pool.query('SELECT * FROM unidad_asignada ORDER BY id'),
-      pool.query('SELECT * FROM estado_traslado ORDER BY id'),
-      pool.query('SELECT * FROM estado_pupilas ORDER BY id'),
-      pool.query('SELECT * FROM estado_piel ORDER BY id'),
-      pool.query('SELECT * FROM tipo_lesion ORDER BY id'),
-      pool.query('SELECT * FROM ubicacion_lesion ORDER BY id'),
-      pool.query('SELECT * FROM tipo_evento ORDER BY id'),
-      pool.query('SELECT * FROM categoria_evento ORDER BY id'),
-      pool.query('SELECT id, nombre_completo AS nombre FROM usuarios ORDER BY nombre_completo'),
-      pool.query('SELECT id, nombre AS codigo, nombre AS descripcion FROM unidad_asignada ORDER BY nombre')
-    ]);
-
+    // --- MODIFICADO: Ahora usa la caché ---
+    const catalogs = await getCatalogos(); 
+    if (!catalogs) {
+      return res.status(500).json({ error: 'Error interno al cargar catálogos' });
+    }
+    
+    // Devolvemos las listas que el frontend espera
     res.json({
-      tipos_activacion: tipos_activacion.rows,
-      causa_clinica: causa_clinica.rows,
-      agentes_causantes: agentes_causantes.rows,
-      causas_traumaticas: causas_traumaticas.rows,
-      unidades: unidades.rows,
-      estados_traslado: estados_traslado.rows,
-      estados_pupilas: estados_pupilas.rows,
-      estados_piel: estados_piel.rows,
-      tipos_lesion: tipos_lesion.rows,
-      ubicaciones_lesion: ubicaciones_lesion.rows,
-      tipos_evento: tipos_evento.rows,
-      categorias: categorias_evento.rows,
-      personal: personal.rows,
-      unidades_transporte: unidades_transporte.rows
+      tipos_activacion: catalogs.listas.tipos_activacion,
+      causa_clinica: catalogs.listas.causa_clinica,
+      agentes_causantes: catalogs.listas.agentes_causantes,
+      causas_traumaticas: catalogs.listas.causas_traumaticas,
+      unidades: catalogs.listas.unidades,
+      estados_traslado: catalogs.listas.estados_traslado,
+      estados_pupilas: catalogs.listas.estados_pupilas,
+      estados_piel: catalogs.listas.estados_piel,
+      tipos_lesion: catalogs.listas.tipos_lesion,
+      ubicaciones_lesion: catalogs.listas.ubicaciones_lesion,
+      tipos_evento: catalogs.listas.tipos_evento,
+      categorias: catalogs.listas.categorias,
+      personal: catalogs.listas.personal,
+      // Hacemos un mapeo para las unidades de transporte (usado en eventos)
+      unidades_transporte: catalogs.listas.unidades.map(u => ({ id: u.id, codigo: u.nombre, descripcion: u.nombre }))
     });
   } catch (err) {
     console.error('❌ Error al obtener catálogos:', err);
@@ -258,10 +367,11 @@ app.get('/api/catalogos', verificarToken, async (req, res) => {
   }
 });
 
-// --- RUTAS PARA ACTIVACIONES (CON LOG DETALLADO) ---
+// --- RUTAS PARA ACTIVACIONES ---
 
-// Crear una activación: [Permitido para rol 'usuario' y 'admin']
+// Crear una activación (Sin cambios)
 app.post('/api/activaciones', verificarToken, async (req, res) => {
+  // ... (tu código de POST /api/activaciones no cambia)
   const { paciente_nombre } = req.body;
   const client = await pool.connect();
   try {
@@ -350,8 +460,10 @@ app.post('/api/activaciones', verificarToken, async (req, res) => {
 
 // Ver activaciones (Sin cambios)
 app.get('/api/activaciones', verificarToken, async (req, res) => {
+  // ... (tu código de GET /api/activaciones no cambia)
   const { scope, fecha_inicio, fecha_fin } = req.query;
   try {
+// [En server.js]
     let query = `
       SELECT 
         a.id,
@@ -361,14 +473,23 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         a.paciente_nombre,
         a.paciente_edad,
         a.paciente_sexo,
+        a.hospital_destino,                   -- <-- AÑADIDO: Para la columna Hospital
+        
         ta.nombre AS tipo_activacion,
-        cc.nombre AS causa_clinica
+        cc.nombre AS causa_clinica,
+        ua.nombre AS unidad_asignada_nombre,  -- <-- AÑADIDO: Para la columna Unidad
+        
+        a.id_tipo_activacion,                 -- <-- AÑADIDO: Para el filtro
+        a.id_causa_clinica,                   -- <-- AÑADIDO: Para el filtro
+        a.id_unidad_asignada                  -- <-- AÑADIDO: Para el filtro
       FROM 
         activaciones AS a
       LEFT JOIN 
         tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
       LEFT JOIN 
         causa_clinica AS cc ON a.id_causa_clinica = cc.id
+      LEFT JOIN 
+        unidad_asignada AS ua ON a.id_unidad_asignada = ua.id -- <-- AÑADIDO: El JOIN para Unidad
     `;
     const values = [];
     if (scope === 'today') {
@@ -388,6 +509,7 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
 
 // Ver una activación (Sin cambios)
 app.get('/api/activaciones/:id', verificarToken, async (req, res) => {
+  // ... (tu código de GET /api/activaciones/:id no cambia)
   const { id } = req.params;
   try {
     const activacionQuery = `
@@ -468,8 +590,7 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
   
   const client = await pool.connect();
   try {
-    // --- ¡NUEVO! PASO 1: Obtener datos antiguos ANTES de actualizar ---
-    // Hacemos un query simple, ya que deep-diff comparará los IDs
+    // --- PASO 1: Obtener datos antiguos (Sin JOINS, solo IDs) ---
     const infoAntigua = await pool.query('SELECT * FROM activaciones WHERE id = $1', [id]);
     if (infoAntigua.rows.length === 0) {
       client.release();
@@ -477,7 +598,7 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
     }
     const datosAntiguos = infoAntigua.rows[0];
 
-    // --- PASO 2: Realizar la transacción de actualización ---
+    // --- PASO 2: Realizar la transacción de actualización (Sin cambios) ---
     await client.query('BEGIN');
     const final_hospital_destino = datosNuevos.requirio_traslado ? datosNuevos.hospital_destino : null;
     const final_id_estado_traslado = !datosNuevos.requirio_traslado ? datosNuevos.id_estado_traslado : null;
@@ -505,7 +626,7 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
     const updateResult = await client.query(activacionQuery, activacionValues);
     const updatedFolio = updateResult.rows[0].num_reporte_local;
 
-    // Actualizar tablas relacionadas
+    // (Actualización de tablas relacionadas... sin cambios)
     await client.query('DELETE FROM activacion_causas_traumaticas WHERE id_activacion = $1', [id]);
     if (datosNuevos.id_causas_traumaticas && datosNuevos.id_causas_traumaticas.length > 0) {
       const causaTraumaticaQuery = 'INSERT INTO activacion_causas_traumaticas (id_activacion, id_causa_traumatica_especifica) VALUES ($1, $2)';
@@ -532,9 +653,9 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
     
     await client.query('COMMIT');
 
-    // --- ¡NUEVO! PASO 3: Generar detalles y registrar historial ---
-    // Comparamos solo los campos relevantes de la tabla principal 'activaciones'
-    const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos);
+    // --- 👇 ¡MODIFICADO! PASO 3: Generar detalles y registrar historial ---
+    const catalogMaps = catalogCache ? catalogCache.maps : null;
+    const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos, catalogMaps);
     
     let detalleFinal = `Editó la activación '${updatedFolio}'. `;
     if (cambiosTexto && cambiosTexto !== '(Sin cambios detectados)') {
@@ -551,7 +672,7 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
       id, 
       detalleFinal
     );
-    // --- FIN DE CAMBIOS ---
+    // --- 👆 FIN DE CAMBIOS 👆 ---
 
     res.status(200).json({ 
       message: 'Activación actualizada exitosamente',
@@ -567,9 +688,9 @@ app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) =
   }
 });
 
-// ¡NUEVO! Borrar una activación
-// [Debe ser Admin, REGISTRO DETALLADO]
+// Borrar una activación (Sin cambios)
 app.delete('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) => {
+    // ... (tu código de DELETE /api/activaciones/:id no cambia)
     const { id } = req.params;
     if (!id) {
         return res.status(400).json({ error: 'ID de activación requerido para eliminar.' });
@@ -596,7 +717,6 @@ app.delete('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res
         await client.query('COMMIT');
         console.log(`✅ Activación ID: ${id} eliminada exitosamente.`);
 
-        // --- REGISTRAR EN HISTORIAL ---
         await registrarHistorial(
           req.user.id, 
           req.user.username, 
@@ -605,7 +725,6 @@ app.delete('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res
           id, 
           `Eliminó la activación '${num_reporte_local}' (Paciente: ${paciente_nombre})`
         );
-        // --- FIN DE REGISTRO ---
 
         res.status(200).json({ 
             message: `Activación con ID ${id} eliminada exitosamente.`,
@@ -624,10 +743,11 @@ app.delete('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res
 });
 
 
-// --- RUTAS PARA EVENTOS (CON LOG DETALLADO) ---
+// --- RUTAS PARA EVENTOS ---
 
-// Crear un evento (Sin cambios en el log)
+// Crear un evento (Sin cambios)
 app.post('/api/eventos', verificarToken, async (req, res) => {
+  // ... (tu código de POST /api/eventos no cambia)
   console.log('📨 RECIBIENDO PETICIÓN POST /api/eventos');
   const { nombre_evento } = req.body;
   const client = await pool.connect();
@@ -703,6 +823,7 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
 
 // Ver eventos (Sin cambios)
 app.get('/api/eventos', verificarToken, async (req, res) => {
+  // ... (tu código de GET /api/eventos no cambia)
   try {
     const query = `
       SELECT 
@@ -735,6 +856,7 @@ app.get('/api/eventos', verificarToken, async (req, res) => {
 
 // Ver un evento (Sin cambios)
 app.get('/api/eventos/:id', verificarToken, async (req, res) => {
+    // ... (tu código de GET /api/eventos/:id no cambia)
     const { id } = req.params;
     try {
         const query = `
@@ -769,7 +891,7 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
     
     const client = await pool.connect();
     try {
-        // --- ¡NUEVO! PASO 1: Obtener datos antiguos ANTES de actualizar ---
+        // --- PASO 1: Obtener datos antiguos (con IDs) ---
         const infoAntiguaQuery = `
             SELECT 
                 e.*, 
@@ -785,7 +907,7 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
         const datosAntiguos = infoAntigua.rows[0];
         datosAntiguos.unidades_atienden = datosAntiguos.unidades_atienden || [];
 
-        // --- PASO 2: Realizar la transacción de actualización ---
+        // --- PASO 2: Realizar la transacción de actualización (Sin cambios) ---
         await client.query('BEGIN');
         const eventoUpdateQuery = `
             UPDATE eventos SET
@@ -815,6 +937,7 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
             throw new Error("Evento no encontrado para actualizar.");
         }
 
+        // (Actualización de tablas relacionadas... sin cambios)
         await client.query('DELETE FROM evento_personal WHERE id_evento = $1', [id]);
         if (datosNuevos.personal_participante_ids && datosNuevos.personal_participante_ids.length > 0) {
             const personalQuery = 'INSERT INTO evento_personal (id_evento, id_usuario) VALUES ($1, $2)';
@@ -836,9 +959,9 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
         }
         await client.query('COMMIT');
 
-        // --- ¡NUEVO! PASO 3: Generar detalles y registrar historial ---
-        // Comparamos los objetos 'antiguo' y 'nuevo'
-        const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos);
+        // --- 👇 ¡MODIFICADO! PASO 3: Generar detalles y registrar historial ---
+        const catalogMaps = catalogCache ? catalogCache.maps : null;
+        const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos, catalogMaps);
 
         let detalleFinal = `Editó el evento '${result.rows[0].nombre_evento}'. `;
         if (cambiosTexto && cambiosTexto !== '(Sin cambios detectados)') {
@@ -855,7 +978,7 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
           id, 
           detalleFinal
         );
-        // --- FIN DE CAMBIOS ---
+        // --- 👆 FIN DE CAMBIOS 👆 ---
 
         res.status(200).json({
             message: 'Evento actualizado exitosamente',
@@ -877,8 +1000,9 @@ app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
     }
 });
 
-// Borrar un evento: [Admin, REGISTRO DETALLADO]
+// Borrar un evento (Sin cambios)
 app.delete('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
+    // ... (tu código de DELETE /api/eventos/:id no cambia)
     const { id } = req.params;
     if (!id) {
         return res.status(400).json({ error: 'ID de evento requerido para eliminar.' });
@@ -931,10 +1055,11 @@ app.delete('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => 
 });
 
 
-// --- RUTAS CRUD PARA USUARIOS (CON LOG DETALLADO) ---
+// --- RUTAS CRUD PARA USUARIOS ---
 
 // OBTENER TODOS LOS USUARIOS (Sin cambios)
 app.get('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
+  // ... (tu código de GET /api/usuarios no cambia)
   try {
     const result = await pool.query('SELECT id, nombre_completo, nombre_usuario, rol, email FROM usuarios ORDER BY nombre_completo');
     res.json(result.rows);
@@ -944,8 +1069,9 @@ app.get('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
   }
 });
 
-// CREAR UN NUEVO USUARIO (Sin cambios en el log)
+// CREAR UN NUEVO USUARIO (Sin cambios)
 app.post('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
+  // ... (tu código de POST /api/usuarios no cambia)
   const { nombre_completo, nombre_usuario, password, rol, email } = req.body;
   if (!nombre_completo || !nombre_usuario || !password || !rol) {
     return res.status(400).json({ error: 'Todos los campos son requeridos: nombre_completo, nombre_usuario, password, rol' });
@@ -987,7 +1113,7 @@ app.post('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
 // ACTUALIZAR UN USUARIO: [Admin, REGISTRO DETALLADO]
 app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
   const { id } = req.params;
-  const datosNuevos = req.body; // { nombre_completo, nombre_usuario, rol, email, password }
+  const datosNuevos = req.body; 
   
   if (!datosNuevos.nombre_completo || !datosNuevos.nombre_usuario || !datosNuevos.rol) {
     return res.status(400).json({ error: 'Los campos nombre_completo, nombre_usuario y rol son requeridos' });
@@ -996,15 +1122,14 @@ app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
     return res.status(400).json({ error: "Rol inválido. Debe ser 'admin' o 'usuario'." });
   }
   try {
-    // --- ¡NUEVO! PASO 1: Obtener datos antiguos ANTES de actualizar ---
-    // (Solo traemos los campos que nos interesan para comparar)
+    // --- PASO 1: Obtener datos antiguos ---
     const infoAntigua = await pool.query('SELECT id, nombre_completo, nombre_usuario, rol, email FROM usuarios WHERE id = $1', [id]);
     if (infoAntigua.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
     const datosAntiguos = infoAntigua.rows[0];
     
-    // --- PASO 2: Preparar y ejecutar la actualización ---
+    // --- PASO 2: Preparar y ejecutar la actualización (Sin cambios) ---
     let query;
     let values;
     let passwordCambiada = false;
@@ -1039,8 +1164,9 @@ app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
     const result = await pool.query(query, values);
     const usuarioActualizado = result.rows[0];
 
-    // --- ¡NUEVO! PASO 3: Generar detalles y registrar historial ---
-    const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos);
+    // --- 👇 ¡MODIFICADO! PASO 3: Generar detalles y registrar historial ---
+    const catalogMaps = catalogCache ? catalogCache.maps : null;
+    const cambiosTexto = generarDetalleDeCambios(datosAntiguos, datosNuevos, catalogMaps);
     
     let detalleFinal = `Editó al usuario '${usuarioActualizado.nombre_usuario}'. `;
     if (cambiosTexto && cambiosTexto !== '(Sin cambios detectados)') {
@@ -1059,9 +1185,9 @@ app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
       'EDITAR', 
       'USUARIO', 
       usuarioActualizado.id, 
-      detalleFinal // <-- ¡El nuevo detalle!
+      detalleFinal
     );
-    // --- FIN DE CAMBIOS ---
+    // --- 👆 FIN DE CAMBIOS 👆 ---
 
     res.status(200).json(usuarioActualizado);
   } catch (err) {
@@ -1073,8 +1199,9 @@ app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
   }
 });
 
-// BORRAR UN USUARIO (Log detallado ya estaba)
+// BORRAR UN USUARIO (Sin cambios)
 app.delete('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
+  // ... (tu código de DELETE /api/usuarios/:id no cambia)
   const { id } = req.params;
   if (req.user.id == id) {
     return res.status(403).json({ error: 'No puedes eliminar tu propia cuenta de administrador' });
@@ -1107,11 +1234,12 @@ app.delete('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) =>
 
 // --- RUTA PARA VER EL HISTORIAL (Sin cambios) ---
 app.get('/api/historial', [verificarToken, adminOnly], async (req, res) => {
+  // ... (tu código de GET /api/historial no cambia)
   try {
     const result = await pool.query(
       `SELECT * FROM historial_actividad 
        ORDER BY timestamp DESC 
-       LIMIT 100` // Traemos los 100 más recientes
+       LIMIT 100`
     );
     res.json(result.rows);
   } catch (err) {
@@ -1122,8 +1250,14 @@ app.get('/api/historial', [verificarToken, adminOnly], async (req, res) => {
 
 
 // 7. Iniciar Servidor
-app.listen(PORT, () => {
-  console.log(`✅ Servidor backend unificado corriendo en http://localhost:${PORT}`);
-  console.log(`📋 Módulos disponibles: Activaciones, Eventos, Usuarios, Historial`);
-  console.log(`🔒 Seguridad: Rutas protegidas por Token JWT y Roles de Admin.`);
+// --- 👇 ¡MODIFICADO! Cargamos la caché antes de iniciar ---
+getCatalogos().then(() => {
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor backend unificado corriendo en http://localhost:${PORT}`);
+    console.log(`📋 Módulos disponibles: Activaciones, Eventos, Usuarios, Historial`);
+    console.log(`🔒 Seguridad: Rutas protegidas por Token JWT y Roles de Admin.`);
+  });
+}).catch(err => {
+    console.error("❌ No se pudo iniciar el servidor por error al cargar catálogos:", err);
+    process.exit(1);
 });

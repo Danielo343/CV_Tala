@@ -7,6 +7,13 @@
         <i class="fas fa-ambulance"></i>
         <span class="button-text">PREHOSPITALARIO</span>
       </router-link>
+
+      <router-link to="/consultas" custom v-slot="{ navigate, isActive }">
+        <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
+          <i class="fas fa-chart-line"></i>
+          <span class="button-text">Consultas</span>
+        </button>
+      </router-link>
       
       <router-link to="/eventos" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">

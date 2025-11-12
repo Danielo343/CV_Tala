@@ -27,25 +27,27 @@
         </div>
         <div class="card-body">
           <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Fecha de Activación (Hora del evento)</label>
-              <input 
-                type="date" 
-                v-model="formulario.fecha_activacion" 
-                class="form-control" 
-                :readonly="isEditing"
-                required
-              >
-            </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Fecha de Activación (Hora del evento)</label>
+          <input 
+            type="date" 
+            v-model="formulario.fecha_activacion" 
+            class="form-control" 
+            :readonly="isEditing"
+            :class="{ 'bg-light': isEditing }"
+            required
+          >
+          </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Hora de Activación (Hora del evento)</label>
               <input 
                 type="time" 
                 v-model="formulario.hora_activacion" 
-                class="form-control" 
-                :readonly="isEditing"
-                required
-              >
+            class="form-control" 
+            :readonly="isEditing"
+            :class="{ 'bg-light': isEditing }"
+            required
+          >
             </div>
           </div>
           <div class="row">
@@ -279,32 +281,15 @@
 
       <!-- Solo mostrar acciones si no estamos en modal -->
       <div v-if="showActions" class="form-actions">
-        <div class="actions-left">
-          <button type="button" class="btn btn-outline-secondary btn-lg" @click="handleCancel">
-            <i class="fas fa-times me-2"></i>
-            <b>Cancelar</b>
-          </button>
-        </div>
-        
-        <div class="actions-right">
-          <!-- Botón de eliminar solo visible en modo edición -->
-          <button 
-            v-if="isEditing" 
-            type="button" 
-            class="btn btn-danger btn-lg me-2" 
-            @click="confirmarEliminacion"
-            :disabled="saving"
-          >
-            <i class="fas fa-trash me-2"></i>
-            <b>Eliminar Registro</b>
-          </button>
-          
-          <button type="submit" class="btn btn-primary btn-lg" :disabled="saving">
-            <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-            <i v-else class="fas fa-save me-2"></i>
-            <b>{{ initialData ? 'Guardar Cambios' : 'Guardar Registro' }}</b>
-          </button>
-        </div>
+        <button type="button" class="btn btn-outline-secondary btn-lg" @click="handleCancel">
+          <i class="fas fa-times me-2"></i>
+          <b>Cancelar</b>
+        </button>
+        <button type="submit" class="btn btn-primary btn-lg" :disabled="saving">
+          <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
+          <i v-else class="fas fa-save me-2"></i>
+          <b>{{ initialData ? 'Guardar Cambios' : 'Guardar Registro' }}</b>
+        </button>
       </div>
     </form>
   </div>
@@ -356,15 +341,15 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  initialData: {
+  initialData: { // Los datos para "editar". Si es null, es un "nuevo" registro
     type: Object,
     default: null
   },
-  loading: {
+  loading: { // Para mostrar el spinner
     type: Boolean,
     default: false
   },
-  saving: {
+  saving: { // Para deshabilitar el botón de guardar
     type: Boolean,
     default: false
   },
@@ -389,7 +374,7 @@ const props = defineProps({
 });
 
 // --- Emits: Eventos que el componente envía al "padre" ---
-const emit = defineEmits(['save', 'cancel', 'save-error', 'delete']);
+const emit = defineEmits(['save', 'cancel', 'save-error']);
 
 // --- Estado Interno del Formulario ---
 const formulario = ref(initialFormState());
@@ -398,9 +383,34 @@ const formElement = ref(null);
 const currentDate = computed(() => new Date().toISOString().split('T')[0]);
 const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5));
 
-// --- Computadas ---
+// --- NUEVO: Computada para saber si estamos editando ---
 const isEditing = computed(() => !!props.initialData);
 
+// --- Lógica de llenado del formulario ---
+watch(() => props.initialData, (newData) => {
+  console.log("Datos iniciales recibidos por el formulario:", newData);
+  if (newData) {
+    // Modo Edición: Copiamos los datos
+    formulario.value = JSON.parse(JSON.stringify(newData));
+    
+    // Ajustamos los datos que no son 1 a 1
+    // 1. Causas Traumáticas (el form espera un array de IDs)
+    formulario.value.id_causas_traumaticas = (newData.causas_traumaticas || []).map(c => c.id);
+
+    // 2. Asegurarnos que 'evaluacion' y 'lesiones' no sean null
+    formulario.value.evaluacion = newData.evaluacion || initialFormState().evaluacion;
+    formulario.value.lesiones = newData.lesiones || initialFormState().lesiones;
+
+    // 3. Sincronizar el switch de reporte externo
+    tieneReporteExterno.value = formulario.value.origen_reporte !== 'Local';
+  } else {
+    // Modo Creación: Reseteamos
+    formulario.value = initialFormState();
+    tieneReporteExterno.value = false;
+  }
+}, { immediate: true });
+
+// --- Computadas (internas del formulario) ---
 const isAnisocoria = computed(() => {
     if (!props.catalogs.estados_pupilas) return false;
     const pupilaSeleccionada = props.catalogs.estados_pupilas.find(p => p.id === formulario.value.evaluacion.id_estado_pupilas);
@@ -415,22 +425,7 @@ const mostrarOtroTipoActivacion = computed(() => {
     return tipoSeleccionado?.nombre === 'Otro';
 });
 
-// --- Watchers ---
-watch(() => props.initialData, (newData) => {
-  console.log("Datos iniciales recibidos por el formulario:", newData);
-  if (newData) {
-    formulario.value = JSON.parse(JSON.stringify(newData));
-    
-    formulario.value.id_causas_traumaticas = (newData.causas_traumaticas || []).map(c => c.id);
-    formulario.value.evaluacion = newData.evaluacion || initialFormState().evaluacion;
-    formulario.value.lesiones = newData.lesiones || initialFormState().lesiones;
-    tieneReporteExterno.value = formulario.value.origen_reporte !== 'Local';
-  } else {
-    formulario.value = initialFormState();
-    tieneReporteExterno.value = false;
-  }
-}, { immediate: true });
-
+// --- Watchers (internos del formulario) ---
 watch(tieneReporteExterno, (esExterno) => {
   if (!esExterno) {
     formulario.value.origen_reporte = 'Local';
@@ -464,16 +459,6 @@ const agregarLesion = () => {
 
 const eliminarLesion = (index) => {
   formulario.value.lesiones.splice(index, 1);
-};
-
-// --- Método para confirmar eliminación ---
-const confirmarEliminacion = () => {
-  const folio = formulario.value.num_reporte_local || 'este registro';
-  const paciente = formulario.value.paciente_nombre || 'N/A';
-  
-  if (confirm(`¿Está seguro que desea ELIMINAR permanentemente el registro?\n\nFolio: ${folio}\nPaciente: ${paciente}\n\nEsta acción no se puede deshacer.`)) {
-    emit('delete', formulario.value.id);
-  }
 };
 
 // --- Métodos de Submit y Cancel ---
@@ -511,6 +496,7 @@ const handleSubmit = () => {
   // Preparar datos para enviar
   const datosParaEnviar = {
     ...formulario.value,
+    // Asegurar que el ID esté presente en modo edición
     id: props.initialData?.id || formulario.value.id
   };
 
@@ -635,21 +621,14 @@ defineExpose({
   margin-top: 1rem;
 }
 
-/* Estilos para las acciones del formulario */
 .form-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: center;
   gap: 1rem;
+  text-align: center;
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid #e9ecef;
-}
-
-.actions-left, .actions-right {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
 }
 
 /* ESTADOS DE CARGA */
@@ -672,16 +651,6 @@ defineExpose({
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .form-actions {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .actions-left, .actions-right {
-    width: 100%;
-    justify-content: center;
-  }
-  
-  .actions-right {
     flex-direction: column;
   }
 }

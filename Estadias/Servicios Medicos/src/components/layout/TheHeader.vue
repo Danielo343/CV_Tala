@@ -5,16 +5,6 @@
         <i class="fas fa-heartbeat"></i>
         <span>CV Tala</span>
       </div>
-
-      <ul class="nav-tabs">
-        <router-link to="/" custom v-slot="{ navigate, isActive }">
-          <li :class="{ active: isActive }" @click="navigate">REPORTES</li>
-        </router-link>
-        <router-link to="/consultas" custom v-slot="{ navigate, isActive }">
-          <li :class="{ active: isActive }" @click="navigate">CONSULTAS</li>
-        </router-link>
-      </ul>
-
       <!-- --- MENÚ DE USUARIO ACTUALIZADO --- -->
       <div class="user-menu">
         

@@ -1,129 +1,199 @@
 <template>
   <div class="consultas-container">
-    <div class="page-header">
-      <div class="header-content">
-        <div class="title-section">
+    <!-- Header más compacto -->
+    <div class="page-header-compact">
+      <div class="header-content-compact">
+        <div class="title-section-compact">
           <i class="fas fa-chart-line header-icon"></i>
           <div>
             <h1 class="page-title">Consultas y Reportes</h1>
             <p class="page-subtitle">Analiza y consulta los registros prehospitalarios</p>
           </div>
         </div>
-        <div class="header-stats">
-          <div class="stat-card">
-            <div class="stat-value">{{ resultados.length }}</div>
-            <div class="stat-label">Registros encontrados</div>
+        <div class="header-stats-compact">
+          <div class="stat-badge">
+            <span class="stat-value">{{ resultados.length }}</span>
+            <span class="stat-label">registros</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="filters-panel">
-      <div class="panel-header">
-        <h3><i class="fas fa-filter me-2"></i>Filtros de Búsqueda</h3>
-        <button 
-          class="btn btn-sm btn-outline-secondary" 
-          @click="resetFiltros"
-          :disabled="cargando"
-        >
-          <i class="fas fa-undo me-1"></i>Limpiar
-        </button>
-      </div>
-      
-      <div class="panel-body">
-        <div class="quick-filters-section">
-          <label class="section-label">Periodos Predefinidos</label>
-          <div class="quick-filters-grid">
+    <!-- Panel de Filtros Mejorado -->
+    <div class="filters-panel-compact">
+      <div class="panel-header-compact">
+        <div class="filters-header">
+          <h3><i class="fas fa-filter me-2"></i>Filtros de Búsqueda</h3>
+          <div class="header-actions">
             <button 
-              type="button" 
-              class="quick-filter-btn"
-              :class="{ active: filtroActivo === 'hoy' }"
-              @click="setFiltroRapido('hoy')"
+              class="btn btn-sm btn-outline-secondary" 
+              @click="resetFiltros"
               :disabled="cargando"
             >
-              <i class="fas fa-calendar-day"></i>
-              <span>Hoy</span>
+              <i class="fas fa-undo me-1"></i>Limpiar
             </button>
             <button 
-              type="button" 
-              class="quick-filter-btn"
-              :class="{ active: filtroActivo === 'semana' }"
-              @click="setFiltroRapido('semana')"
-              :disabled="cargando"
+              class="btn btn-sm btn-outline-info" 
+              @click="toggleFiltrosAvanzados"
             >
-              <i class="fas fa-calendar-week"></i>
-              <span>Esta Semana</span>
-            </button>
-            <button 
-              type="button" 
-              class="quick-filter-btn"
-              :class="{ active: filtroActivo === 'mes' }"
-              @click="setFiltroRapido('mes')"
-              :disabled="cargando"
-            >
-              <i class="fas fa-calendar-alt"></i>
-              <span>Este Mes</span>
-            </button>
-            <button 
-              type="button" 
-              class="quick-filter-btn"
-              :class="{ active: filtroActivo === 'anio' }"
-              @click="setFiltroRapido('anio')"
-              :disabled="cargando"
-            >
-              <i class="fas fa-calendar"></i>
-              <span>Este Año</span>
+              <i class="fas fa-sliders-h me-1"></i>
+              {{ mostrarFiltrosAvanzados ? 'Simple' : 'Avanzado' }}
             </button>
           </div>
         </div>
-
-        <div class="custom-filters-section">
-          <label class="section-label">Rango Personalizado</label>
-          <form @submit.prevent="buscarActivaciones" class="custom-filters-form">
-            <div class="date-inputs-grid">
-              <div class="form-group">
-                <label for="fecha_inicio" class="form-label">
-                  <i class="fas fa-calendar-plus me-1"></i>Fecha Inicio
-                </label>
-                <input 
-                  type="date" 
-                  class="form-control" 
-                  id="fecha_inicio" 
-                  v-model="filtros.fecha_inicio" 
-                  required
-                  :disabled="cargando"
-                >
-              </div>
-              <div class="form-group">
-                <label for="fecha_fin" class="form-label">
-                  <i class="fas fa-calendar-minus me-1"></i>Fecha Fin
-                </label>
-                <input 
-                  type="date" 
-                  class="form-control" 
-                  id="fecha_fin" 
-                  v-model="filtros.fecha_fin" 
-                  required
-                  :disabled="cargando"
-                >
-              </div>
-              <div class="form-group search-btn-container">
-                <button 
-                  type="submit" 
-                  class="btn btn-primary search-btn"
-                  :disabled="cargando"
-                >
-                  <i class="fas fa-search me-2"></i>
-                  {{ cargando ? 'Buscando...' : 'Buscar' }}
-                </button>
-              </div>
+      </div>
+      
+      <div class="panel-body-compact">
+        <!-- Búsqueda Rápida en Tiempo Real -->
+        <div class="search-real-time">
+          <div class="search-input-container">
+            <i class="fas fa-search search-icon"></i>
+            <input 
+              type="text" 
+              class="search-input" 
+              placeholder="Buscar por nombre, folio, causa..."
+              v-model="busquedaTexto"
+              @input="buscarEnTiempoReal"
+              :disabled="cargando"
+            >
+            <div v-if="busquedaTexto" class="search-clear" @click="limpiarBusqueda">
+              <i class="fas fa-times"></i>
             </div>
-          </form>
+          </div>
         </div>
 
-        <div v-if="periodoSeleccionado" class="period-info">
-          <i class="fas fa-info-circle me-2"></i>
-          Mostrando registros del: <strong>{{ periodoSeleccionado }}</strong>
+        <!-- Filtros Principales -->
+        <div class="main-filters-grid">
+          <!-- Filtros Rápidos -->
+          <div class="filter-group">
+            <label class="filter-label">Periodo</label>
+            <div class="quick-filters-compact">
+              <button 
+                v-for="periodo in periodosRapidos" 
+                :key="periodo.id"
+                type="button" 
+                class="quick-filter-btn-compact"
+                :class="{ active: filtroActivo === periodo.id }"
+                @click="setFiltroRapido(periodo.id)"
+                :disabled="cargando"
+              >
+                <i :class="periodo.icono"></i>
+                <span>{{ periodo.nombre }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filtros por Fecha -->
+          <div class="filter-group">
+            <label class="filter-label">Rango de Fechas</label>
+            <div class="date-filters-compact">
+              <div class="date-input-compact">
+                <label>Desde</label>
+                <input 
+                  type="date" 
+                  class="form-control form-control-sm" 
+                  v-model="filtros.fecha_inicio" 
+                  :disabled="cargando"
+                >
+              </div>
+              <div class="date-input-compact">
+                <label>Hasta</label>
+                <input 
+                  type="date" 
+                  class="form-control form-control-sm" 
+                  v-model="filtros.fecha_fin" 
+                  :disabled="cargando"
+                >
+              </div>
+              <button 
+                class="btn btn-primary btn-sm search-btn-compact"
+                @click="buscarActivaciones"
+                :disabled="cargando"
+              >
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtros Avanzados (Colapsable) -->
+        <div v-if="mostrarFiltrosAvanzados" class="advanced-filters">
+          <div class="advanced-filters-grid">
+            <div class="filter-group">
+              <label class="filter-label">Tipo de Activación</label>
+              <select 
+                class="form-control form-control-sm" 
+                v-model="filtrosAvanzados.tipo_activacion"
+                @change="aplicarFiltrosAvanzados"
+              >
+                <option value="">Todos los tipos</option>
+                <option v-for="tipo in catalogos.tipos_activacion" :key="tipo.id" :value="tipo.id">
+                  {{ tipo.nombre }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Causa Clínica</label>
+              <select 
+                class="form-control form-control-sm" 
+                v-model="filtrosAvanzados.causa_clinica"
+                @change="aplicarFiltrosAvanzados"
+              >
+                <option value="">Todas las causas</option>
+                <option v-for="causa in catalogos.causa_clinica" :key="causa.id" :value="causa.id">
+                  {{ causa.nombre }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Unidad Asignada</label>
+              <select 
+                class="form-control form-control-sm" 
+                v-model="filtrosAvanzados.unidad_asignada"
+                @change="aplicarFiltrosAvanzados"
+              >
+                <option value="">Todas las unidades</option>
+                <option v-for="unidad in catalogos.unidades" :key="unidad.id" :value="unidad.id">
+                  {{ unidad.nombre }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Rango de Edad</label>
+              <div class="age-range-filters">
+                <input 
+                  type="number" 
+                  class="form-control form-control-sm" 
+                  placeholder="Mín" 
+                  v-model="filtrosAvanzados.edad_min"
+                  @change="aplicarFiltrosAvanzados"
+                >
+                <span class="age-separator">-</span>
+                <input 
+                  type="number" 
+                  class="form-control form-control-sm" 
+                  placeholder="Máx" 
+                  v-model="filtrosAvanzados.edad_max"
+                  @change="aplicarFiltrosAvanzados"
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info del Periodo -->
+        <div v-if="periodoSeleccionado" class="period-info-compact">
+          <i class="fas fa-calendar me-1"></i>
+          <span>{{ periodoSeleccionado }}</span>
+          <span v-if="busquedaTexto" class="search-info">
+            • Búsqueda: "{{ busquedaTexto }}"
+          </span>
+          <span v-if="filtrosAvanzadosActivos" class="filters-info">
+            • Filtros activos
+          </span>
         </div>
       </div>
     </div>
@@ -131,11 +201,11 @@
     <!-- Contenedor Principal con Panel Deslizante -->
     <div class="main-layout" :class="{ 'editing-mode': panelActivo }">
       
-      <!-- Sección de Resultados -->
-      <div class="results-section" :class="{ 'compressed': panelActivo }">
-        <div class="results-header">
+      <!-- Sección de Resultados Mejorada -->
+      <div class="results-section-improved" :class="{ 'compressed': panelActivo }">
+        <div class="results-header-improved">
           <h3>Resultados de la Búsqueda</h3>
-          <div class="results-actions">
+          <div class="results-actions-improved">
             <button 
               class="btn btn-outline-secondary btn-sm"
               @click="exportarResultados"
@@ -146,78 +216,106 @@
           </div>
         </div>
 
-        <div class="results-content">
-          <div v-if="cargando" class="loading-state">
-            <div class="spinner-container">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-3">Buscando registros en el sistema...</p>
-            </div>
+        <div class="results-content-improved">
+          <!-- Estados de carga, error, vacío -->
+          <div v-if="cargando" class="loading-state-compact">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+            <span>Buscando registros...</span>
           </div>
 
-          <div v-else-if="error" class="error-state">
-            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-            <h4>Error en la búsqueda</h4>
-            <p class="text-muted">{{ error }}</p>
-            <button class="btn btn-primary mt-2" @click="buscarActivaciones">
-              <i class="fas fa-redo me-2"></i>Reintentar
-            </button>
+          <div v-else-if="error" class="error-state-compact">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <span>{{ error }}</span>
+            <button class="btn btn-link btn-sm" @click="buscarActivaciones">Reintentar</button>
           </div>
 
-          <div v-else-if="resultados.length > 0" class="table-container">
+          <div v-else-if="resultadosFiltrados.length === 0" class="empty-state-compact">
+            <i class="fas fa-search me-2"></i>
+            <span>No se encontraron registros con los filtros actuales</span>
+            <button class="btn btn-link btn-sm" @click="resetFiltros">Limpiar filtros</button>
+          </div>
+
+          <!-- Tabla Mejorada -->
+          <div v-else class="table-container-improved">
             <div class="table-responsive">
-              <table class="results-table">
+              <table class="results-table-improved">
                 <thead>
                   <tr>
                     <th class="folio-col">Folio</th>
-                    <th class="fecha-col">Fecha y Hora</th>
+                    <th class="fecha-col">Fecha/Hora</th>
                     <th class="paciente-col">Paciente</th>
+                    <th class="edad-col">Edad</th>
                     <th class="tipo-col">Tipo</th>
+                    <th class="unidad-col">Unidad</th>
                     <th class="causa-col">Causa</th>
+                    <th class="hospital-col">Hospital</th>
                     <th class="acciones-col">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="activacion in resultados" :key="activacion.id" class="result-row">
-                    <td class="folio-cell">
-                      <div class="folio-badge">{{ activacion.num_reporte_local }}</div>
+                  <tr 
+                    v-for="activacion in resultadosFiltrados" 
+                    :key="activacion.id" 
+                    class="result-row-improved"
+                    @dblclick="verDetalle(activacion)"
+                  >
+                    <td class="folio-cell-improved">
+                      <div class="folio-badge-improved">{{ activacion.num_reporte_local }}</div>
                     </td>
-                    <td class="fecha-cell">
-                      <div class="fecha-text">
-                        {{ formatDateForDisplay(activacion.fecha_activacion) }}
-                      </div>
+                    <td class="fecha-cell-improved">
+                      <div class="fecha-text">{{ formatDateForDisplay(activacion.fecha_activacion) }}</div>
                       <div class="hora-text">{{ activacion.hora_activacion }}</div>
                     </td>
-                    <td class="paciente-cell">
+                    <td class="paciente-cell-improved">
                       <div class="paciente-nombre">{{ activacion.paciente_nombre }}</div>
-                      <div v-if="activacion.paciente_edad" class="paciente-info">
+                    </td>
+                    <td class="edad-cell-improved">
+                      <span v-if="activacion.paciente_edad" class="edad-badge">
                         {{ activacion.paciente_edad }} años
-                      </div>
+                      </span>
+                      <span v-else class="text-muted">N/A</span>
                     </td>
-                    <td class="tipo-cell">
-                      <span class="badge tipo-badge">{{ activacion.tipo_activacion || 'N/A' }}</span>
+                    <td class="tipo-cell-improved">
+                      <span class="badge tipo-badge-improved">
+                        {{ activacion.tipo_activacion || 'N/A' }}
+                      </span>
                     </td>
-                    <td class="causa-cell">
+                    <td class="unidad-cell-improved">
+                      <span class="unidad-text">{{ activacion.unidad_asignada_nombre || 'N/A' }}</span>
+                    </td>
+                    <td class="causa-cell-improved">
                       <span class="causa-text">{{ activacion.causa_clinica || 'N/A' }}</span>
                     </td>
-                    <td class="acciones-cell">
-                      <div class="action-buttons">
+                    <td class="hospital-cell-improved">
+                      <span class="hospital-text">{{ activacion.hospital_destino || 'N/A' }}</span>
+                    </td>
+                    <td class="acciones-cell-improved">
+                      <div class="action-buttons-improved">
                         <button 
-                          class="btn btn-sm btn-outline-primary action-btn"
+                          class="btn btn-sm btn-outline-primary action-btn-compact"
                           @click="verDetalle(activacion)"
+                          title="Ver detalles"
                         >
-                          <i class="fas fa-eye me-1"></i>Ver
+                          <i class="fas fa-eye"></i>
                         </button>
                         
-                        <!-- Botón para edición rápida en panel -->
                         <button 
                           v-if="isAdmin" 
-                          class="btn btn-sm btn-outline-warning action-btn"
+                          class="btn btn-sm btn-outline-warning action-btn-compact"
                           @click="abrirPanelEdicion(activacion)"
                           title="Edición rápida"
                         >
-                          <i class="fas fa-edit me-1"></i>Editar
+                          <i class="fas fa-edit"></i>
+                        </button>
+
+                        <!-- Botón de Eliminar Mejorado -->
+                        <button 
+                          v-if="isAdmin" 
+                          class="btn btn-sm btn-outline-danger action-btn-compact"
+                          @click="solicitarEliminacion(activacion)"
+                          title="Eliminar registro"
+                        >
+                          <i class="fas fa-trash"></i>
                         </button>
                       </div>
                     </td>
@@ -226,27 +324,25 @@
               </table>
             </div>
             
-            <div class="table-footer">
-              <div class="results-count">
-                Mostrando {{ resultados.length }} registro{{ resultados.length !== 1 ? 's' : '' }}
+            <div class="table-footer-improved">
+              <div class="results-count-improved">
+                Mostrando {{ resultadosFiltrados.length }} de {{ resultados.length }} registro{{ resultados.length !== 1 ? 's' : '' }}
+              </div>
+              <div class="table-actions-improved">
+                <button 
+                  class="btn btn-sm btn-outline-secondary"
+                  @click="scrollToTop"
+                  v-if="resultadosFiltrados.length > 10"
+                >
+                  <i class="fas fa-arrow-up me-1"></i>Volver arriba
+                </button>
               </div>
             </div>
-          </div>
-
-          <div v-else class="empty-state">
-            <div class="empty-icon">
-              <i class="fas fa-search fa-3x"></i>
-            </div>
-            <h4>No se encontraron registros</h4>
-            <p class="text-muted">Intenta con un rango de fechas diferente o ajusta los filtros de búsqueda.</p>
-            <button class="btn btn-outline-primary mt-2" @click="resetFiltros">
-              <i class="fas fa-undo me-2"></i>Restablecer filtros
-            </button>
           </div>
         </div>
       </div>
 
-      <!-- Panel de Edición Deslizante -->
+      <!-- Panel de Edición Deslizante (COMPLETO - SIN CAMBIOS) -->
       <div class="edition-panel" :class="{ 'active': panelActivo }">
         <div class="panel-header">
           <div class="panel-title">
@@ -317,7 +413,45 @@
       <div class="panel-overlay" :class="{ 'active': panelActivo }" @click="cerrarPanelEdicion"></div>
     </div>
 
-    <!-- Modal de Detalle (se mantiene igual) -->
+    <!-- Modal de Confirmación de Eliminación -->
+    <div class="modal fade" id="modalConfirmarEliminacion" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Confirmar Eliminación
+            </h5>
+          </div>
+          <div class="modal-body">
+            <p>¿Está seguro de eliminar permanentemente este registro?</p>
+            <div v-if="registroAEliminar" class="alert alert-warning">
+              <strong>Folio:</strong> {{ registroAEliminar.num_reporte_local }}<br>
+              <strong>Paciente:</strong> {{ registroAEliminar.paciente_nombre }}<br>
+              <strong>Fecha:</strong> {{ formatDateForDisplay(registroAEliminar.fecha_activacion) }}
+            </div>
+            <p class="text-danger"><small>Esta acción no se puede deshacer.</small></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-1"></i>Cancelar
+            </button>
+            <button 
+              type="button" 
+              class="btn btn-danger" 
+              @click="confirmarEliminacion"
+              :disabled="eliminando"
+            >
+              <span v-if="eliminando" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="fas fa-trash me-1"></i>
+              {{ eliminando ? 'Eliminando...' : 'Eliminar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Detalle (COMPLETO - SIN CAMBIOS) -->
     <div class="modal fade" id="modalDetalleActivacion" ref="modalDetalleRef" tabindex="-1" aria-labelledby="modalDetalleLabel" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -475,6 +609,14 @@ const toISODate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeText = (str) => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .normalize("NFD") // Descompone caracteres (ej: "ó" -> "o" + "´")
+    .replace(/[\u0300-\u036f]/g, ""); // Elimina los acentos
+};
+
 const formatDateForDisplay = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
@@ -494,6 +636,7 @@ export default {
     const router = useRouter();
     const isAdmin = computed(() => store.getters.isAdmin);
     
+    // Estados principales existentes
     const filtros = ref({
       fecha_inicio: toISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
       fecha_fin: toISODate(new Date())
@@ -504,7 +647,20 @@ export default {
     const error = ref(null);
     const filtroActivo = ref('mes');
 
+    // Nuevos estados para mejoras
+    const busquedaTexto = ref('');
+    const mostrarFiltrosAvanzados = ref(false);
+    const filtrosAvanzados = ref({
+      tipo_activacion: '',
+      causa_clinica: '',
+      unidad_asignada: '',
+      edad_min: '',
+      edad_max: ''
+    });
+    
     const catalogos = ref({});
+    const registroAEliminar = ref(null);
+    const eliminando = ref(false);
 
     // --- Estado para el Modal de "Ver Detalle" ---
     const modalDetalleRef = ref(null); 
@@ -529,6 +685,62 @@ export default {
       const fin = formatDateForDisplay(filtros.value.fecha_fin);
       return `${inicio} al ${fin}`;
     });
+
+    // Nuevas computadas para mejoras
+    const filtrosAvanzadosActivos = computed(() => {
+      return Object.values(filtrosAvanzados.value).some(val => val !== '');
+    });
+
+    const resultadosFiltrados = computed(() => {
+      if (!busquedaTexto.value && !filtrosAvanzadosActivos.value) {
+        return resultados.value;
+      }
+
+      return resultados.value.filter(activacion => {
+        // Filtro de búsqueda de texto
+          let coincideTexto = true;
+            if (busquedaTexto.value) {
+              const texto = normalizeText(busquedaTexto.value); // <-- USA LA FUNCIÓN
+
+              coincideTexto = 
+                (normalizeText(activacion.paciente_nombre).includes(texto)) ||
+                (normalizeText(activacion.num_reporte_local).includes(texto)) ||
+                (normalizeText(activacion.causa_clinica).includes(texto)) ||
+                (normalizeText(activacion.tipo_activacion).includes(texto)) ||
+                (normalizeText(activacion.hospital_destino).includes(texto));
+            }
+
+        // Filtros avanzados
+        let coincideAvanzado = true;
+        if (filtrosAvanzadosActivos.value) {
+          if (filtrosAvanzados.value.tipo_activacion && activacion.id_tipo_activacion) {
+            coincideAvanzado = coincideAvanzado && activacion.id_tipo_activacion == filtrosAvanzados.value.tipo_activacion;
+          }
+          if (filtrosAvanzados.value.causa_clinica && activacion.id_causa_clinica) {
+            coincideAvanzado = coincideAvanzado && activacion.id_causa_clinica == filtrosAvanzados.value.causa_clinica;
+          }
+          if (filtrosAvanzados.value.unidad_asignada && activacion.id_unidad_asignada) {
+            coincideAvanzado = coincideAvanzado && activacion.id_unidad_asignada == filtrosAvanzados.value.unidad_asignada;
+          }
+          if (filtrosAvanzados.value.edad_min && activacion.paciente_edad) {
+            coincideAvanzado = coincideAvanzado && activacion.paciente_edad >= parseInt(filtrosAvanzados.value.edad_min);
+          }
+          if (filtrosAvanzados.value.edad_max && activacion.paciente_edad) {
+            coincideAvanzado = coincideAvanzado && activacion.paciente_edad <= parseInt(filtrosAvanzados.value.edad_max);
+          }
+        }
+
+        return coincideTexto && coincideAvanzado;
+      });
+    });
+
+    // Datos para filtros rápidos
+    const periodosRapidos = ref([
+      { id: 'hoy', nombre: 'Hoy', icono: 'fas fa-calendar-day' },
+      { id: 'semana', nombre: 'Semana', icono: 'fas fa-calendar-week' },
+      { id: 'mes', nombre: 'Mes', icono: 'fas fa-calendar-alt' },
+      { id: 'anio', nombre: 'Año', icono: 'fas fa-calendar' }
+    ]);
 
     // --- Métodos de la Vista ---
     const cargarCatalogos = async () => {
@@ -591,12 +803,73 @@ export default {
         fecha_fin: toISODate(hoy)
       };
       filtroActivo.value = 'mes';
+      busquedaTexto.value = '';
+      filtrosAvanzados.value = {
+        tipo_activacion: '',
+        causa_clinica: '',
+        unidad_asignada: '',
+        edad_min: '',
+        edad_max: ''
+      };
       buscarActivaciones();
     };
 
     const exportarResultados = () => {
       console.log('Exportando resultados:', resultados.value);
       alert('Función de exportación en desarrollo');
+    };
+
+    // --- Nuevos Métodos para Mejoras ---
+    const buscarEnTiempoReal = () => {
+      // No necesita hacer nada adicional porque resultadosFiltrados es computada
+    };
+
+    const limpiarBusqueda = () => {
+      busquedaTexto.value = '';
+    };
+
+    const toggleFiltrosAvanzados = () => {
+      mostrarFiltrosAvanzados.value = !mostrarFiltrosAvanzados.value;
+    };
+
+    const aplicarFiltrosAvanzados = () => {
+      // No necesita hacer nada adicional porque resultadosFiltrados es computada
+    };
+
+    const solicitarEliminacion = (activacion) => {
+      registroAEliminar.value = activacion;
+      const modal = new Modal(document.getElementById('modalConfirmarEliminacion'));
+      modal.show();
+    };
+
+    const confirmarEliminacion = async () => {
+      if (!registroAEliminar.value) return;
+      
+      eliminando.value = true;
+      try {
+        await api.delete(`/activaciones/${registroAEliminar.value.id}`);
+        
+        // Cerrar modal
+        const modal = Modal.getInstance(document.getElementById('modalConfirmarEliminacion'));
+        modal.hide();
+        
+        // Recargar resultados
+        await buscarActivaciones();
+        
+        // Mostrar mensaje de éxito
+        console.log('Registro eliminado exitosamente');
+        
+      } catch (err) {
+        console.error('Error al eliminar:', err);
+        error.value = 'Error al eliminar el registro';
+      } finally {
+        eliminando.value = false;
+        registroAEliminar.value = null;
+      }
+    };
+
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     // --- Métodos del Modal de "Ver Detalle" ---
@@ -663,7 +936,6 @@ export default {
   try {
     console.log("Enviando actualización:", payload);
     
-    // CORRECCIÓN: Eliminar el /api duplicado
     const resp = await api.put(`/activaciones/${payload.id}`, payload);
     
     mensajeEdicion.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`;
@@ -737,8 +1009,9 @@ export default {
       }
     });
 
-    // --- Return ---
+    // --- Return COMPLETO ---
     return {
+      // Estados principales
       filtros,
       resultados,
       cargando,
@@ -747,17 +1020,24 @@ export default {
       periodoSeleccionado,
       isAdmin,
       catalogos,
-      buscarActivaciones,
-      setFiltroRapido,
-      resetFiltros,
-      exportarResultados,
-      formatDateForDisplay,
+      
+      // Nuevos estados para mejoras
+      busquedaTexto,
+      mostrarFiltrosAvanzados,
+      filtrosAvanzados,
+      resultadosFiltrados,
+      periodosRapidos,
+      registroAEliminar,
+      eliminando,
+      filtrosAvanzadosActivos,
+
+      // Estados del modal de detalle
       modalDetalleRef,
       cargandoDetalle,
       errorDetalle,
       activacionSeleccionada,
-      verDetalle,
-      // Panel de edición
+
+      // Estados del panel de edición
       panelActivo,
       formActivacionRef,
       cargandoFormulario,
@@ -765,6 +1045,27 @@ export default {
       datosParaEditar,
       mensajeEdicion,
       tipoMensajeEdicion,
+
+      // Métodos principales
+      buscarActivaciones,
+      setFiltroRapido,
+      resetFiltros,
+      exportarResultados,
+      formatDateForDisplay,
+
+      // Nuevos métodos para mejoras
+      buscarEnTiempoReal,
+      limpiarBusqueda,
+      toggleFiltrosAvanzados,
+      aplicarFiltrosAvanzados,
+      solicitarEliminacion,
+      confirmarEliminacion,
+      scrollToTop,
+
+      // Métodos del modal de detalle
+      verDetalle,
+
+      // Métodos del panel de edición
       abrirPanelEdicion,
       cerrarPanelEdicion,
       ejecutarGuardado,
@@ -778,372 +1079,469 @@ export default {
 </script>
 
 <style scoped>
+/* Estilos compactos y mejorados */
 .consultas-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: 1rem;
 }
 
-.page-header {
+/* Header Compacto */
+.page-header-compact {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
   overflow: hidden;
 }
 
-.header-content {
+.header-content-compact {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2rem;
+  padding: 1rem 1.5rem;
 }
 
-.title-section {
+.title-section-compact {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .header-icon {
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   opacity: 0.9;
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 600;
   margin: 0;
 }
 
 .page-subtitle {
   opacity: 0.9;
   margin: 0.25rem 0 0 0;
-  font-size: 1rem;
+  font-size: 0.875rem;
 }
 
-.header-stats {
+.header-stats-compact {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
-.stat-card {
+.stat-badge {
   background: rgba(255, 255, 255, 0.2);
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
   backdrop-filter: blur(10px);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1;
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   opacity: 0.9;
 }
 
-.filters-panel {
+/* Panel de Filtros Compacto */
+.filters-panel-compact {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
   overflow: hidden;
 }
 
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
+.panel-header-compact {
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid #e9ecef;
   background: #f8f9fa;
 }
 
-.panel-header h3 {
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filters-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #495057;
 }
 
-.panel-body {
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.panel-body-compact {
   padding: 1.5rem;
 }
 
-.section-label {
+/* Búsqueda en Tiempo Real */
+.search-real-time {
+  margin-bottom: 1.5rem;
+}
+
+.search-input-container {
+  position: relative;
+  max-width: 400px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6c757d;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 2.5rem 0.5rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px;
+}
+
+.search-clear:hover {
+  color: #495057;
+}
+
+/* Filtros Principales */
+.main-filters-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-label {
   font-weight: 600;
   color: #495057;
-  margin-bottom: 1rem;
-  display: block;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.quick-filters-section {
-  margin-bottom: 2rem;
-}
-
-.quick-filters-grid {
+.quick-filters-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
 }
 
-.quick-filter-btn {
+.quick-filter-btn-compact {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
   background: white;
   color: #6c757d;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   cursor: pointer;
+  font-size: 0.75rem;
 }
 
-.quick-filter-btn:hover {
+.quick-filter-btn-compact:hover {
   border-color: #007bff;
   color: #007bff;
-  transform: translateY(-2px);
 }
 
-.quick-filter-btn.active {
+.quick-filter-btn-compact.active {
   border-color: #007bff;
   background: #007bff;
   color: white;
 }
 
-.quick-filter-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.quick-filter-btn-compact i {
+  font-size: 1rem;
 }
 
-.quick-filter-btn i {
-  font-size: 1.25rem;
-}
-
-.custom-filters-section {
-  margin-bottom: 1.5rem;
-}
-
-.custom-filters-form {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 8px;
-}
-
-.date-inputs-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 1rem;
-  align-items: end;
-}
-
-.form-group {
-  margin-bottom: 0;
-}
-
-.search-btn-container {
+.date-filters-compact {
   display: flex;
+  gap: 0.5rem;
   align-items: end;
 }
 
-.search-btn {
-  height: fit-content;
-  white-space: nowrap;
+.date-input-compact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.period-info {
+.date-input-compact label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.search-btn-compact {
+  height: fit-content;
+  padding: 0.375rem 0.75rem;
+}
+
+/* Filtros Avanzados */
+.advanced-filters {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.advanced-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.age-range-filters {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.age-separator {
+  color: #6c757d;
+  font-weight: 600;
+}
+
+/* Info del Periodo */
+.period-info-compact {
   background: #e7f3ff;
   border: 1px solid #b3d9ff;
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
   color: #0066cc;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Layout Principal con Panel */
-.main-layout {
-  position: relative;
+.search-info, .filters-info {
+  font-weight: 600;
+}
+
+/* Estados Compactos */
+.loading-state-compact,
+.error-state-compact,
+.empty-state-compact {
+  padding: 1.5rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #6c757d;
+}
+
+.error-state-compact {
+  color: #dc3545;
+}
+
+/* Tabla Mejorada */
+.results-section-improved {
   transition: all 0.3s ease;
 }
 
-.results-section {
-  transition: all 0.3s ease;
-}
-
-.results-section.compressed {
+.results-section-improved.compressed {
   width: calc(100% - 600px);
   opacity: 0.7;
   pointer-events: none;
 }
 
-.results-header {
+.results-header-improved {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid #e9ecef;
   background: #f8f9fa;
 }
 
-.results-header h3 {
+.results-header-improved h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #495057;
 }
 
-.results-content {
+.table-container-improved {
   padding: 0;
 }
 
-.loading-state, .error-state, .empty-state {
-  padding: 3rem;
-  text-align: center;
-}
-
-.spinner-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.error-state i {
-  color: #dc3545;
-}
-
-.empty-icon {
-  color: #6c757d;
-  margin-bottom: 1rem;
-}
-
-.table-container {
-  padding: 0;
-}
-
-.table-responsive {
-  overflow-x: auto;
-}
-
-.results-table {
+.results-table-improved {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.8rem;
 }
 
-.results-table thead {
+.results-table-improved thead {
   background: #f8f9fa;
+  position: sticky;
+  top: 0;
 }
 
-.results-table th {
-  padding: 1rem;
+.results-table-improved th {
+  padding: 0.75rem;
   font-weight: 600;
   color: #495057;
   text-align: left;
   border-bottom: 2px solid #dee2e6;
-  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-size: 0.75rem;
 }
 
-.results-table td {
-  padding: 1rem;
+.results-table-improved td {
+  padding: 0.75rem;
   border-bottom: 1px solid #e9ecef;
   vertical-align: middle;
 }
 
-.result-row:hover {
+.result-row-improved:hover {
   background: #f8f9fa;
+  cursor: pointer;
 }
 
-.folio-cell {
-  width: 120px;
+/* Celdas Específicas */
+.folio-cell-improved {
+  width: 100px;
 }
 
-.folio-badge {
+.folio-badge-improved {
   background: #007bff;
   color: white;
-  padding: 0.4rem 0.75rem;
-  border-radius: 20px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   text-align: center;
   display: inline-block;
 }
 
-.fecha-cell {
-  width: 140px;
+.fecha-cell-improved {
+  width: 100px;
 }
 
 .fecha-text {
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
 }
 
 .hora-text {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #6c757d;
 }
 
-.paciente-cell {
-  width: 200px;
+.paciente-cell-improved {
+  width: 150px;
 }
 
 .paciente-nombre {
   font-weight: 500;
-}
-
-.paciente-info {
   font-size: 0.8rem;
-  color: #6c757d;
 }
 
-.tipo-cell {
+.edad-cell-improved {
+  width: 70px;
+}
+
+.edad-badge {
+  background: #6c757d;
+  color: white;
+  padding: 0.2rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+}
+
+.tipo-cell-improved {
+  width: 120px;
+}
+
+.tipo-badge-improved {
+  background: #6c757d;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+}
+
+.unidad-cell-improved {
+  width: 120px;
+}
+
+.unidad-text {
+  font-size: 0.8rem;
+}
+
+.causa-cell-improved {
   width: 150px;
 }
 
-.tipo-badge {
-  background: #6c757d;
-  color: white;
-  padding: 0.35rem 0.65rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-}
-
-.causa-cell {
-  min-width: 200px;
-}
-
 .causa-text {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
-.acciones-cell {
-  width: 220px;
+.hospital-cell-improved {
+  width: 120px;
 }
 
-.action-buttons {
+.hospital-text {
+  font-size: 0.8rem;
+}
+
+.acciones-cell-improved {
+  width: 140px;
+}
+
+.action-buttons-improved {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
-.action-btn {
-  font-size: 0.75rem;
+.action-btn-compact {
   padding: 0.25rem 0.5rem;
-  white-space: nowrap;
+  font-size: 0.7rem;
 }
 
-.table-footer {
-  padding: 1rem 1.5rem;
+/* Footer de Tabla */
+.table-footer-improved {
+  padding: 0.75rem 1rem;
   border-top: 1px solid #e9ecef;
   background: #f8f9fa;
   display: flex;
@@ -1151,12 +1549,17 @@ export default {
   align-items: center;
 }
 
-.results-count {
+.results-count-improved {
   color: #6c757d;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
-/* Panel de Edición Deslizante */
+.table-actions-improved {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Panel de Edición (ESTILOS ORIGINALES COMPLETOS) */
 .edition-panel {
   position: fixed;
   top: 0;
@@ -1266,7 +1669,7 @@ export default {
   visibility: visible;
 }
 
-/* Estilos del Modal de Detalle */
+/* Estilos del Modal de Detalle (ORIGINALES COMPLETOS) */
 .modal-header {
   background: var(--bg-light, #f8f9fa);
   border-bottom: 1px solid var(--border-color, #dee2e6);
@@ -1347,8 +1750,16 @@ export default {
     right: -550px;
   }
   
-  .results-section.compressed {
+  .results-section-improved.compressed {
     width: calc(100% - 550px);
+  }
+  
+  .main-filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .advanced-filters-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1358,44 +1769,47 @@ export default {
     right: -500px;
   }
   
-  .results-section.compressed {
+  .results-section-improved.compressed {
     width: calc(100% - 500px);
   }
 }
 
 @media (max-width: 768px) {
-  .header-content {
+  .header-content-compact {
     flex-direction: column;
     gap: 1rem;
     text-align: center;
   }
   
-  .action-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .action-btn {
-    width: 100%;
-  }
-  
-  .date-inputs-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .quick-filters-grid {
+  .quick-filters-compact {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .results-header {
+  .date-filters-compact {
+    flex-direction: column;
+  }
+  
+  .advanced-filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .results-header-improved {
     flex-direction: column;
     gap: 1rem;
+  }
+  
+  .table-footer-improved {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .action-buttons-improved {
+    flex-direction: column;
     align-items: stretch;
   }
   
-  .results-actions {
-    display: flex;
-    justify-content: center;
+  .action-btn-compact {
+    width: 100%;
   }
   
   .edition-panel {
@@ -1403,7 +1817,7 @@ export default {
     right: -100%;
   }
   
-  .results-section.compressed {
+  .results-section-improved.compressed {
     width: 100%;
     opacity: 0.3;
     pointer-events: none;
@@ -1423,11 +1837,11 @@ export default {
     padding: 0.5rem;
   }
   
-  .panel-body, .results-content {
+  .panel-body-compact {
     padding: 1rem;
   }
   
-  .quick-filters-grid {
+  .quick-filters-compact {
     grid-template-columns: 1fr;
   }
   
@@ -1435,4 +1849,4 @@ export default {
     flex-direction: column;
   }
 }
-</style>
+</style>  
