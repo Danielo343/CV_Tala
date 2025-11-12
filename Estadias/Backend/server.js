@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken'); 
 require('dotenv').config();
 
 // 2. Configuración del Servidor
@@ -59,13 +60,27 @@ app.post('/api/auth/login', async (req, res) => {
         console.log('------------------------\n');
 
         if (passwordValida) {
+            
+            const tokenPayload = {
+              id: user.id,
+              username: user.nombre_usuario,
+              rol: user.rol 
+            };
+
+            const token = jwt.sign(
+              tokenPayload,
+              process.env.JWT_SECRET,
+              { expiresIn: '8h' } 
+            );
+
             res.json({
                 id: user.id,
                 username: user.nombre_usuario,
                 name: user.nombre_completo,
                 rol: user.rol,
-                accessToken: 'fake-token-para-desarrollo-' + user.id
+                accessToken: token 
             });
+
         } else {
             res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
@@ -76,19 +91,49 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// 5. Endpoint para obtener todos los catálogos (ACTUALIZADO CON EVENTOS)
-app.get('/api/catalogos', async (req, res) => {
+// --- 5. Middlewares de Seguridad ---
+// "Guardia 1": Verifica que el token sea válido (que estés logueado)
+const verificarToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; 
+
+    if (token == null) {
+        return res.status(401).json({ message: 'Acceso denegado: No hay token' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Token no válido o expirado' });
+        }
+        req.user = user; 
+        next(); 
+    });
+};
+
+// "Guardia 2": Verifica que el rol sea 'admin'
+const adminOnly = (req, res, next) => {
+    // Revisa el 'rol' que 'verificarToken' ya puso en req.user
+    // Tu BD usa 'admin' y 'usuario'
+    if (req.user && req.user.rol === 'admin') {
+        next(); // Es admin, puede continuar
+    } else {
+        // No es admin, acceso denegado
+        res.status(403).json({ message: 'Acceso denegado: Se requiere rol de Administrador' });
+    }
+};
+// --- FIN MIDDLEWARES ---
+
+
+// 6. Endpoint de Catálogos
+// Todos los usuarios logueados (admin o "usuario") pueden ver los catálogos
+app.get('/api/catalogos', verificarToken, async (req, res) => {
   try {
     const [
-      // Catálogos originales de activaciones
       tipos_activacion, causa_clinica, agentes_causantes,
       causas_traumaticas, unidades, estados_traslado,
       estados_pupilas, estados_piel, tipos_lesion, ubicaciones_lesion,
-      
-      // Nuevos catálogos para eventos
       tipos_evento, categorias_evento, personal, unidades_transporte
     ] = await Promise.all([
-      // Consultas originales
       pool.query('SELECT * FROM tipo_activacion ORDER BY id'),
       pool.query('SELECT * FROM causa_clinica ORDER BY id'),
       pool.query('SELECT * FROM agente_causante_general ORDER BY id'),
@@ -99,8 +144,6 @@ app.get('/api/catalogos', async (req, res) => {
       pool.query('SELECT * FROM estado_piel ORDER BY id'),
       pool.query('SELECT * FROM tipo_lesion ORDER BY id'),
       pool.query('SELECT * FROM ubicacion_lesion ORDER BY id'),
-      
-      // Nuevas consultas para eventos
       pool.query('SELECT * FROM tipo_evento ORDER BY id'),
       pool.query('SELECT * FROM categoria_evento ORDER BY id'),
       pool.query('SELECT id, nombre_completo AS nombre FROM usuarios ORDER BY nombre_completo'),
@@ -108,7 +151,6 @@ app.get('/api/catalogos', async (req, res) => {
     ]);
 
     res.json({
-      // Catálogos originales
       tipos_activacion: tipos_activacion.rows,
       causa_clinica: causa_clinica.rows,
       agentes_causantes: agentes_causantes.rows,
@@ -119,8 +161,6 @@ app.get('/api/catalogos', async (req, res) => {
       estados_piel: estados_piel.rows,
       tipos_lesion: tipos_lesion.rows,
       ubicaciones_lesion: ubicaciones_lesion.rows,
-      
-      // Nuevos catálogos para eventos
       tipos_evento: tipos_evento.rows,
       categorias: categorias_evento.rows,
       personal: personal.rows,
@@ -132,9 +172,10 @@ app.get('/api/catalogos', async (req, res) => {
   }
 });
 
-// --- RUTAS PARA ACTIVACIONES (TUS RUTAS ORIGINALES) ---
+// --- RUTAS PARA ACTIVACIONES (PROTEGIDAS CON ROL) ---
 
-app.post('/api/activaciones', async (req, res) => {
+// Crear una activación: [Debe estar logueado, Debe ser Admin]
+app.post('/api/activaciones', [verificarToken, adminOnly], async (req, res) => {
   const {
     fecha_activacion, hora_activacion, origen_reporte, num_reporte_externo, 
     requirio_traslado = false, hospital_destino, paciente_nombre, paciente_edad = null, 
@@ -231,7 +272,8 @@ app.post('/api/activaciones', async (req, res) => {
   }
 });
 
-app.get('/api/activaciones', async (req, res) => {
+// Ver activaciones: [Debe estar logueado]
+app.get('/api/activaciones', verificarToken, async (req, res) => {
   const { scope, fecha_inicio, fecha_fin } = req.query;
 
   try {
@@ -274,7 +316,8 @@ app.get('/api/activaciones', async (req, res) => {
   }
 });
 
-app.get('/api/activaciones/:id', async (req, res) => {
+// Ver una activación: [Debe estar logueado]
+app.get('/api/activaciones/:id', verificarToken, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -357,7 +400,8 @@ app.get('/api/activaciones/:id', async (req, res) => {
   }
 });
 
-app.put('/api/activaciones/:id', async (req, res) => {
+// Editar una activación: [Debe estar logueado, Debe ser Admin]
+app.put('/api/activaciones/:id', [verificarToken, adminOnly], async (req, res) => {
   const { id } = req.params;
   
   const {
@@ -471,9 +515,10 @@ app.put('/api/activaciones/:id', async (req, res) => {
   }
 });
 
-// --- RUTAS PARA EVENTOS (NUEVAS RUTAS DE TU COMPAÑERO) ---
+// --- RUTAS PARA EVENTOS (PROTEGIDAS CON ROL) ---
 
-app.post('/api/eventos', async (req, res) => {
+// Crear un evento: [Debe estar logueado, Debe ser Admin]
+app.post('/api/eventos', [verificarToken, adminOnly], async (req, res) => {
   console.log('📨 RECIBIENDO PETICIÓN POST /api/eventos');
   const {
     nombre_evento, id_tipo_evento, id_categoria, fecha, hora_inicio, hora_fin,
@@ -612,7 +657,8 @@ app.post('/api/eventos', async (req, res) => {
   }
 });
 
-app.get('/api/eventos', async (req, res) => {
+// Ver eventos: [Debe estar logueado]
+app.get('/api/eventos', verificarToken, async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -648,7 +694,8 @@ app.get('/api/eventos', async (req, res) => {
   }
 });
 
-app.get('/api/eventos/:id', async (req, res) => {
+// Ver un evento: [Debe estar logueado]
+app.get('/api/eventos/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -676,7 +723,8 @@ app.get('/api/eventos/:id', async (req, res) => {
     }
 });
 
-app.put('/api/eventos/:id', async (req, res) => {
+// Editar un evento: [Debe estar logueado, Debe ser Admin]
+app.put('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
     const { id } = req.params;
     
     const {
@@ -793,7 +841,8 @@ app.put('/api/eventos/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/eventos/:id', async (req, res) => {
+// Borrar un evento: [Debe estar logueado, Debe ser Admin]
+app.delete('/api/eventos/:id', [verificarToken, adminOnly], async (req, res) => {
     const { id } = req.params;
     
     if (!id) {
@@ -805,6 +854,11 @@ app.delete('/api/eventos/:id', async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // Las tablas 'evento_personal' y 'evento_unidades' deberían tener ON DELETE CASCADE
+        // pero por si acaso, las eliminamos manualmente (aunque no es necesario si la BD está bien)
+        // await client.query('DELETE FROM evento_personal WHERE id_evento = $1', [id]);
+        // await client.query('DELETE FROM evento_unidades WHERE id_evento = $1', [id]);
+        
         const deleteQuery = 'DELETE FROM eventos WHERE id = $1 RETURNING id;';
         
         const result = await client.query(deleteQuery, [id]);
@@ -835,8 +889,153 @@ app.delete('/api/eventos/:id', async (req, res) => {
     }
 });
 
-// 6. Iniciar Servidor
+
+// --- ¡NUEVO! RUTAS CRUD PARA USUARIOS ---
+// Todas estas rutas requieren ser Administrador
+
+// OBTENER TODOS LOS USUARIOS
+app.get('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
+  try {
+    // Excluimos el hash de la contraseña de la respuesta
+    const result = await pool.query('SELECT id, nombre_completo, nombre_usuario, rol, email FROM usuarios ORDER BY nombre_completo');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error al obtener usuarios:', err);
+    res.status(500).json({ error: 'Error interno al consultar usuarios' });
+  }
+});
+
+// CREAR UN NUEVO USUARIO
+app.post('/api/usuarios', [verificarToken, adminOnly], async (req, res) => {
+  const { nombre_completo, nombre_usuario, password, rol, email } = req.body;
+
+  if (!nombre_completo || !nombre_usuario || !password || !rol) {
+    return res.status(400).json({ error: 'Todos los campos son requeridos: nombre_completo, nombre_usuario, password, rol' });
+  }
+  
+  // Validar rol
+  if (rol !== 'admin' && rol !== 'usuario') {
+    return res.status(400).json({ error: "Rol inválido. Debe ser 'admin' o 'usuario'." });
+  }
+
+  try {
+    // Generamos el hash de la contraseña
+    const salt = bcrypt.genSaltSync(10);
+    const contrasena_hash = bcrypt.hashSync(password, salt);
+
+    const query = `
+      INSERT INTO usuarios (nombre_completo, nombre_usuario, contrasena_hash, rol, email)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, nombre_completo, nombre_usuario, rol, email;
+    `;
+    const values = [nombre_completo, nombre_usuario, contrasena_hash, rol, email || null];
+    
+    const result = await pool.query(query, values);
+    res.status(201).json(result.rows[0]);
+
+  } catch (err) {
+    if (err.code === '23505') { // Error de "unique constraint"
+      return res.status(409).json({ error: 'El nombre de usuario ya existe' });
+    }
+    console.error('Error al crear usuario:', err);
+    res.status(500).json({ error: 'Error interno al crear el usuario' });
+  }
+});
+
+// ACTUALIZAR UN USUARIO
+app.put('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
+  const { id } = req.params;
+  const { nombre_completo, nombre_usuario, rol, email, password } = req.body;
+
+  if (!nombre_completo || !nombre_usuario || !rol) {
+    return res.status(400).json({ error: 'Los campos nombre_completo, nombre_usuario y rol son requeridos' });
+  }
+
+  // Validar rol
+  if (rol !== 'admin' && rol !== 'usuario') {
+    return res.status(400).json({ error: "Rol inválido. Debe ser 'admin' o 'usuario'." });
+  }
+
+  try {
+    let query;
+    let values;
+
+    if (password && password.trim() !== '') {
+      // Si se provee una nueva contraseña, la hasheamos
+      const salt = bcrypt.genSaltSync(10);
+      const contrasena_hash = bcrypt.hashSync(password, salt);
+      
+      query = `
+        UPDATE usuarios SET
+          nombre_completo = $1,
+          nombre_usuario = $2,
+          rol = $3,
+          email = $4,
+          contrasena_hash = $5
+        WHERE id = $6
+        RETURNING id, nombre_completo, nombre_usuario, rol, email;
+      `;
+      values = [nombre_completo, nombre_usuario, rol, email || null, contrasena_hash, id];
+    } else {
+      // Si no se provee contraseña, no actualizamos el hash
+      query = `
+        UPDATE usuarios SET
+          nombre_completo = $1,
+          nombre_usuario = $2,
+          rol = $3,
+          email = $4
+        WHERE id = $5
+        RETURNING id, nombre_completo, nombre_usuario, rol, email;
+      `;
+      values = [nombre_completo, nombre_usuario, rol, email || null, id];
+    }
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    res.status(200).json(result.rows[0]);
+
+  } catch (err) {
+    if (err.code === '23505') { // Error de "unique constraint"
+      return res.status(409).json({ error: 'El nombre de usuario ya existe' });
+    }
+    console.error(`Error al actualizar usuario ${id}:`, err);
+    res.status(500).json({ error: 'Error interno al actualizar el usuario' });
+  }
+});
+
+// BORRAR UN USUARIO
+app.delete('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) => {
+  const { id } = req.params;
+  
+  // No permitir que un admin se borre a sí mismo
+  if (req.user.id == id) {
+    return res.status(403).json({ error: 'No puedes eliminar tu propia cuenta de administrador' });
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.status(200).json({ message: 'Usuario eliminado exitosamente' });
+
+  } catch (err) {
+    console.error(`Error al eliminar usuario ${id}:`, err);
+    res.status(500).json({ error: 'Error interno al eliminar el usuario' });
+  }
+});
+// --- FIN RUTAS CRUD USUARIOS ---
+
+
+// 7. Iniciar Servidor
 app.listen(PORT, () => {
   console.log(`✅ Servidor backend unificado corriendo en http://localhost:${PORT}`);
   console.log(`📋 Módulos disponibles: Activaciones + Eventos/Simulacros`);
+  console.log(`🔒 Seguridad: Rutas protegidas por Token JWT y Roles de Admin.`);
 });

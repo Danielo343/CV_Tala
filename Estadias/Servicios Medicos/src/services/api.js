@@ -9,4 +9,22 @@ const api = axios.create({
   }
 });
 
+// --- ¡AÑADE ESTO! ---
+// Interceptor para añadir el token a CADA petición
+api.interceptors.request.use(config => {
+  // 1. Busca al usuario en localStorage
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  // 2. Si existe el usuario y tiene un token...
+  if (user && user.accessToken) {
+    // 3. Añade el encabezado de autorización
+    // El formato es "Bearer TOKEN_LARGO"
+    config.headers['Authorization'] = 'Bearer ' + user.accessToken;
+  }
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
+// --- FIN DE LO AÑADIDO ---
+
 export default api;

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import store from '@/store' // <-- IMPORTA EL STORE
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 
@@ -6,6 +7,8 @@ import DashboardView from '@/views/DashboardView.vue'
 import RegistroPrehospitalario from '@/views/modules/RegistroPrehospitalario.vue'
 import ConsultasView from '@/views/modules/ConsultasView.vue'
 import EventosView from '@/views/modules/EventosView.vue'
+// --- ¡NUEVO! Importamos la nueva vista de admin ---
+import GestionUsuarios from '@/views/modules/GestionUsuarios.vue'
 
 const routes = [
   {
@@ -17,7 +20,7 @@ const routes = [
   {
     path: '/',
     component: DashboardView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true }, // Todas las rutas hijas requieren estar logueado
     children: [
       {
         path: '', // La raíz "/" mostrará los reportes
@@ -33,16 +36,30 @@ const routes = [
         path: 'eventos', // La ruta "/eventos"
         name: 'Eventos',
         component: EventosView
+      },
+      // --- ¡NUEVA RUTA! ---
+      {
+        path: 'gestion-usuarios',
+        name: 'GestionUsuarios',
+        component: GestionUsuarios,
+        meta: { 
+          requiresAuth: true,
+          adminOnly: true // Esta ruta específica requiere ser admin
+        }
       }
+      // --- FIN DE RUTA NUEVA ---
     ]
   },
   // Ruta separada para edición completa (fuera del Dashboard)
   {
     path: '/editar-registro/:id',
     name: 'EditarRegistro',
-    component: () => import('@/views/modules/EditarRegistroView.vue'), // <-- CORREGIDO
+    component: () => import('@/views/modules/EditarRegistroView.vue'),
     props: true,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      adminOnly: true // Solo admins pueden entrar a la página de editar
+    }
   }
 ]
 
@@ -51,16 +68,27 @@ const router = createRouter({
   routes
 })
 
-// El guard de navegación se mantiene igual
+// --- ¡GUARDIA DE NAVEGACIÓN MEJORADO! ---
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = !!localStorage.getItem('user');
+  // Usamos el getter de Vuex para saber si está logueado
+  const isAuthenticated = store.getters.isLoggedIn;
+  
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+  const requiresAdmin = to.matched.some(record => record.meta.adminOnly);
 
   if (requiresAuth && !isAuthenticated) {
+    // 1. Si requiere login y no está logueado -> A /login
     next('/login');
+  } else if (requiresAdmin && !store.getters.isAdmin) {
+    // 2. Si requiere ser admin y no lo es -> A la raíz
+    // (Ya está logueado, pero no tiene permisos)
+    console.warn('Acceso denegado: Se requiere rol de Administrador para', to.path);
+    next('/'); // Lo mandamos al inicio (Prehospitalario)
   } else if (to.path === '/login' && isAuthenticated) {
+    // 3. Si va a /login pero ya está logueado -> A la raíz
     next('/');
   } else {
+    // 4. En cualquier otro caso, déjalo pasar
     next();
   }
 });

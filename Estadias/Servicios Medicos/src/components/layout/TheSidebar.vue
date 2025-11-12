@@ -20,13 +20,14 @@
 </template>
 
 <script>
+// Volvemos al script original
 export default {
   name: 'TheSidebar'
 };
 </script>
 
 <style scoped>
-/* Copia y pega aquí los estilos desde .dashboard-sidebar hasta .sidebar-button.active i de tu archivo DashboardView.vue */
+/* Tus estilos originales se quedan igual */
 .dashboard-sidebar {
   width: 260px;
   background: white;
