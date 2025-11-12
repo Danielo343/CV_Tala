@@ -15,17 +15,18 @@
         </router-link>
       </ul>
 
+      <!-- --- MENÚ DE USUARIO ACTUALIZADO --- -->
       <div class="user-menu">
-        <div class="notification-icon">
-          <i class="fas fa-bell"></i>
-          <span class="notification-badge">3</span>
-        </div>
         
+        <!-- Icono de Campana ELIMINADO -->
+
+        <!-- Contenedor relativo para el dropdown -->
         <div class="user-avatar-container">
           <div class="user-avatar" @click="toggleDropdown" title="Opciones de usuario">
             {{ userInitials }}
           </div>
 
+          <!-- El menú desplegable -->
           <transition name="dropdown-fade">
             <div v-if="isDropdownOpen" class="user-dropdown">
               <div class="dropdown-header">
@@ -36,6 +37,12 @@
               </div>
               <ul class="dropdown-menu-list">
                 
+                <!-- ¡NUEVO ENLACE! -->
+                <li v-if="isAdmin" @click="goTo('HistorialActividad')">
+                  <i class="fas fa-history"></i>
+                  <span>Historial de Actividad</span>
+                </li>
+
                 <li v-if="isAdmin" @click="goTo('GestionUsuarios')">
                   <i class="fas fa-users-cog"></i>
                   <span>Gestionar Usuarios</span>
@@ -50,24 +57,21 @@
           </transition>
         </div>
       </div>
-      </div>
+      <!-- --- FIN DE CAMBIOS --- -->
+
+    </div>
   </header>
   
+  <!-- Overlay para cerrar el menú al hacer clic fuera -->
   <div v-if="isDropdownOpen" @click="isDropdownOpen = false" class="dropdown-overlay"></div>
 </template>
 
 <script>
-// --- USANDO OPTIONS API (COMO TU ARCHIVO ORIGINAL) ---
 import { mapGetters } from 'vuex';
 
 export default {
   name: 'TheHeader',
   
-  // Línea de prueba que confirma que el SCRIPT se carga
-  created() {
-    console.log("¡VERSIÓN CORRECTA DE TheHeader.vue CARGADA!");
-  },
-
   data() {
     return {
       isDropdownOpen: false
@@ -90,19 +94,16 @@ export default {
   
   methods: {
     handleLogout() {
-      console.log("Clic en Cerrar Sesión"); // Log de prueba
       this.isDropdownOpen = false; 
       this.$store.dispatch('logout');
       this.$router.push('/login');
     },
 
     toggleDropdown() {
-      console.log("Clic en Avatar (toggleDropdown)"); // Log de prueba
       this.isDropdownOpen = !this.isDropdownOpen;
     },
 
     goTo(routeName) {
-      console.log("Clic en goTo:", routeName); // Log de prueba
       this.$router.push({ name: routeName });
       this.isDropdownOpen = false; 
     }
@@ -116,7 +117,6 @@ export default {
   color: #343a40;
   padding: 1rem 2rem;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  /* --- CAMBIO 1 --- */
   z-index: 1001; /* Lo ponemos por ENCIMA del overlay */
   position: relative; /* Necesario para que z-index funcione correctamente */
 }
@@ -170,37 +170,20 @@ export default {
   align-items: center;
   gap: 1.5rem;
 }
+
+/* --- ESTILO DE CAMPANA ELIMINADO --- */
+/*
 .notification-icon {
-  position: relative;
-  font-size: 1.4rem;
-  color: #6c757d;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-}
-.notification-icon:hover {
-  color: #007bff;
-  transform: scale(1.1);
+  ...
 }
 .notification-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background-color: #dc3545;
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  font-size: 0.8rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  ...
 }
+*/
 
 .user-avatar-container {
   position: relative;
 }
-
 .user-avatar {
   width: 48px;
   height: 48px;
@@ -221,11 +204,9 @@ export default {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
-
 .btn-logout {
   display: none;
 }
-
 .user-dropdown {
   position: absolute;
   top: calc(100% + 15px);
@@ -235,10 +216,8 @@ export default {
   border-radius: 12px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border: 1px solid #e9ecef;
-  /* z-index: 1001; */ /* Este z-index ahora es relativo al header (1001) */
   overflow: hidden;
 }
-
 .dropdown-header {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #e9ecef;
@@ -247,7 +226,6 @@ export default {
   align-items: center;
   background: #f8f9fa;
 }
-
 .rol-badge {
   color: white;
   text-transform: capitalize;
@@ -258,14 +236,11 @@ export default {
 .rol-badge.bg-secondary {
   background-color: #6c757d !important;
 }
-
-
 .dropdown-menu-list {
   list-style: none;
   padding: 0.5rem 0;
   margin: 0;
 }
-
 .dropdown-menu-list li {
   display: flex;
   align-items: center;
@@ -276,17 +251,14 @@ export default {
   font-weight: 500;
   color: #343a40;
 }
-
 .dropdown-menu-list li:hover {
   background-color: #e6f2ff;
 }
-
 .dropdown-menu-list li i {
   width: 20px;
   text-align: center;
   color: #6c757d;
 }
-
 .dropdown-menu-list li:last-child {
   color: #dc3545;
 }
@@ -296,23 +268,19 @@ export default {
 .dropdown-menu-list li:last-child:hover {
   background-color: #f8d7da;
 }
-
 .dropdown-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  /* --- CAMBIO 2 --- */
-  z-index: 1000; /* Lo dejamos por DEBAJO del header */
+  z-index: 1000; /* Por debajo del header */
   background: transparent;
 }
-
 .dropdown-fade-enter-active,
 .dropdown-fade-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
-
 .dropdown-fade-enter-from,
 .dropdown-fade-leave-to {
   opacity: 0;

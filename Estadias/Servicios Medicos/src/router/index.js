@@ -7,8 +7,10 @@ import DashboardView from '@/views/DashboardView.vue'
 import RegistroPrehospitalario from '@/views/modules/RegistroPrehospitalario.vue'
 import ConsultasView from '@/views/modules/ConsultasView.vue'
 import EventosView from '@/views/modules/EventosView.vue'
-// --- ¡NUEVO! Importamos la nueva vista de admin ---
 import GestionUsuarios from '@/views/modules/GestionUsuarios.vue'
+// --- ¡NUEVO! Importamos la nueva vista de historial ---
+import HistorialView from '@/views/modules/HistorialView.vue'
+
 
 const routes = [
   {
@@ -37,7 +39,6 @@ const routes = [
         name: 'Eventos',
         component: EventosView
       },
-      // --- ¡NUEVA RUTA! ---
       {
         path: 'gestion-usuarios',
         name: 'GestionUsuarios',
@@ -45,6 +46,16 @@ const routes = [
         meta: { 
           requiresAuth: true,
           adminOnly: true // Esta ruta específica requiere ser admin
+        }
+      },
+      // --- ¡NUEVA RUTA DE HISTORIAL! ---
+      {
+        path: 'historial-actividad',
+        name: 'HistorialActividad',
+        component: HistorialView,
+        meta: { 
+          requiresAuth: true,
+          adminOnly: true // Esta ruta también requiere ser admin
         }
       }
       // --- FIN DE RUTA NUEVA ---

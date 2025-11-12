@@ -296,6 +296,7 @@
               @save="guardarRegistro"
               @cancel="cerrarPanelEdicion"
               @save-error="mostrarErrorEdicion"
+              @delete="eliminarRegistro" 
             />
           </div>
         </div>
@@ -659,24 +660,29 @@ export default {
       mensajeEdicion.value = '';
       tipoMensajeEdicion.value = '';
 
-      try {
-        const resp = await api.put(`/api/activaciones/${payload.id}`, payload);
-        mensajeEdicion.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`;
-        tipoMensajeEdicion.value = 'alert-success';
+  try {
+    console.log("Enviando actualización:", payload);
+    
+    // CORRECCIÓN: Eliminar el /api duplicado
+    const resp = await api.put(`/activaciones/${payload.id}`, payload);
+    
+    mensajeEdicion.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`;
+    tipoMensajeEdicion.value = 'alert-success';
 
-        setTimeout(() => {
-          cerrarPanelEdicion();
-          buscarActivaciones(); 
-        }, 2000);
+    setTimeout(() => {
+      cerrarPanelEdicion();
+      buscarActivaciones();
+    }, 2000);
 
-      } catch (error) {
-         console.error("Error al actualizar:", error.response || error);
-        mensajeEdicion.value = `Error al guardar: ${error.response?.data?.error || 'Verifique los datos.'}`;
-        tipoMensajeEdicion.value = 'alert-danger';
-      } finally {
-        isSaving.value = false;
-      }
-    };
+  } catch (error) {
+    console.error("Error completo al actualizar:", error);
+    console.error("Respuesta del servidor:", error.response?.data);
+    mensajeEdicion.value = `Error al guardar: ${error.response?.data?.error || error.response?.data?.message || 'Verifique los datos.'}`;
+    tipoMensajeEdicion.value = 'alert-danger';
+  } finally {
+    isSaving.value = false;
+  }
+};
 
     // --- Método para edición en página completa ---
     const irAEdicionCompleta = (activacion) => {
@@ -691,6 +697,27 @@ export default {
         router.push(`/editar-registro/${activacion.id}?returnTo=consultas`);
       }
     };
+
+    const eliminarRegistro = async (id) => {
+  if (!confirm('¿Está seguro de eliminar permanentemente este registro? Esta acción no se puede deshacer.')) {
+    return;
+  }
+
+  try {
+    await api.delete(`/activaciones/${id}`);
+    mensajeEdicion.value = 'Registro eliminado correctamente';
+    tipoMensajeEdicion.value = 'alert-success';
+    
+    setTimeout(() => {
+      cerrarPanelEdicion();
+      buscarActivaciones(); // Recargar la lista
+    }, 1500);
+  } catch (error) {
+    console.error('Error al eliminar:', error);
+    mensajeEdicion.value = 'Error al eliminar el registro';
+    tipoMensajeEdicion.value = 'alert-danger';
+  }
+};
 
     // --- Ciclo de vida ---
     onMounted(() => {
@@ -743,7 +770,8 @@ export default {
       ejecutarGuardado,
       guardarRegistro,
       mostrarErrorEdicion,
-      irAEdicionCompleta
+      irAEdicionCompleta,
+      eliminarRegistro
     };
   }
 }

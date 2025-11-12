@@ -30,6 +30,7 @@
         @save="guardarRegistro"
         @cancel="regresarAConsultas"
         @save-error="mostrarError"
+        @delete="eliminarRegistro"
       />
     </div>
   </div>
@@ -83,27 +84,51 @@ export default {
         tipoMensaje.value = 'alert-danger'
       }
     }
+    const eliminarRegistro = async (id) => {
+  if (!confirm('¿Está seguro de eliminar permanentemente este registro? Esta acción no se puede deshacer.')) {
+    return;
+  }
+
+  try {
+    await api.delete(`/activaciones/${id}`);
+    mensaje.value = 'Registro eliminado correctamente';
+    tipoMensaje.value = 'alert-success';
+    
+    setTimeout(() => {
+      regresarAConsultas();
+    }, 1500);
+  } catch (error) {
+    console.error('Error al eliminar:', error);
+    mensaje.value = 'Error al eliminar el registro';
+    tipoMensaje.value = 'alert-danger';
+  }
+};
 
     const guardarRegistro = async (payload) => {
       guardando.value = true
       mensaje.value = ''
       
-      try {
-        const resp = await api.put(`/api/activaciones/${payload.id}`, payload)
-        mensaje.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`
-        tipoMensaje.value = 'alert-success'
-        
-        setTimeout(() => {
-          regresarAConsultas()
-        }, 1500)
-      } catch (error) {
-        console.error('Error al guardar:', error)
-        mensaje.value = `Error al guardar: ${error.response?.data?.error || 'Verifique los datos.'}`
-        tipoMensaje.value = 'alert-danger'
-      } finally {
-        guardando.value = false
-      }
-    }
+  try {
+    console.log("Enviando actualización desde edición completa:", payload);
+    
+    // CORRECCIÓN: Eliminar el /api duplicado
+    const resp = await api.put(`/activaciones/${payload.id}`, payload);
+    
+    mensaje.value = `¡Éxito! Registro ${resp.data.data.num_reporte_local} actualizado.`;
+    tipoMensaje.value = 'alert-success';
+    
+    setTimeout(() => {
+      regresarAConsultas();
+    }, 1500);
+  } catch (error) {
+    console.error('Error completo al guardar:', error);
+    console.error("Respuesta del servidor:", error.response?.data);
+    mensaje.value = `Error al guardar: ${error.response?.data?.error || error.response?.data?.message || 'Verifique los datos.'}`;
+    tipoMensaje.value = 'alert-danger';
+  } finally {
+    guardando.value = false;
+  }
+}
 
     const mostrarError = (msg) => {
       mensaje.value = msg
@@ -132,7 +157,8 @@ export default {
       tipoMensaje,
       guardarRegistro,
       mostrarError,
-      regresarAConsultas
+      regresarAConsultas,
+      eliminarRegistro
     }
   }
 }

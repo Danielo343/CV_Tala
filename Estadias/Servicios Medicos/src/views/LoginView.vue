@@ -13,7 +13,6 @@ export default {
     LoginForm
   },
   mounted() {
-    // Si ya está autenticado, redirigir al dashboard
     if (this.$store.getters.isLoggedIn) {
       this.$router.push('/');
     }
@@ -24,10 +23,6 @@ export default {
 <style scoped>
 .login-view {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
 }
 </style>
