@@ -638,14 +638,14 @@ export default {
     
     // Estados principales existentes
     const filtros = ref({
-      fecha_inicio: toISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
-      fecha_fin: toISODate(new Date())
+      fecha_inicio: '',
+      fecha_fin: ''
     });
     
     const resultados = ref([]);
     const cargando = ref(true);
     const error = ref(null);
-    const filtroActivo = ref('mes');
+    const filtroActivo = ref(null);
 
     // Nuevos estados para mejoras
     const busquedaTexto = ref('');
@@ -799,10 +799,10 @@ export default {
       const hoy = new Date();
       const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
       filtros.value = {
-        fecha_inicio: toISODate(inicioMes),
-        fecha_fin: toISODate(hoy)
+        fecha_inicio: '',
+        fecha_fin: ''
       };
-      filtroActivo.value = 'mes';
+      filtroActivo.value = null;
       busquedaTexto.value = '';
       filtrosAvanzados.value = {
         tipo_activacion: '',
@@ -1487,6 +1487,7 @@ export default {
   padding: 0.2rem 0.4rem;
   border-radius: 10px;
   font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 .tipo-cell-improved {

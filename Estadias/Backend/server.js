@@ -460,12 +460,98 @@ app.post('/api/activaciones', verificarToken, async (req, res) => {
 
 // Ver activaciones (Sin cambios)
 app.get('/api/activaciones', verificarToken, async (req, res) => {
-  // ... (tu código de GET /api/activaciones no cambia)
-  const { scope, fecha_inicio, fecha_fin } = req.query;
+  // Leemos todos los filtros posibles desde req.query
+  const { 
+    fecha_inicio, fecha_fin, 
+    id_tipo_activacion, id_causa_clinica, id_unidad_asignada,
+    id_tipo_lesion, // <-- ¡Nuevo filtro por lesión!
+    edad_min, edad_max,
+    busqueda_texto, // <-- Nuevo filtro de texto
+    scope // Mantenemos el scope para 'Registros del Día'
+  } = req.query;
+
   try {
-// [En server.js]
+    let values = []; // Array para guardar los valores de forma segura
+    let whereClauses = []; // Array para construir la cláusula WHERE
+    
+    // Joins base
+    let joins = `
+      LEFT JOIN tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
+      LEFT JOIN causa_clinica AS cc ON a.id_causa_clinica = cc.id
+      LEFT JOIN unidad_asignada AS ua ON a.id_unidad_asignada = ua.id
+    `;
+
+    // --- Construcción dinámica de la consulta ---
+
+    if (scope === 'today') {
+      // Para la vista de 'RegistroPrehospitalario'
+      // Usa fecha_captura para ver lo que se registró HOY
+      whereClauses.push(`a.fecha_captura = CURRENT_DATE`);
+    
+    } else if (fecha_inicio && fecha_fin) {
+      // Para 'Consultas' si se especifica un rango
+      values.push(fecha_inicio, fecha_fin);
+      whereClauses.push(`a.fecha_activacion BETWEEN $${values.length - 1} AND $${values.length}`);
+    }
+    // Si no hay scope ni fechas, simplemente no añade filtro de fecha (trae todo)
+
+    // Filtro de Búsqueda de Texto
+    if (busqueda_texto) {
+      // ILIKE es como LIKE, pero ignora mayúsculas/minúsculas
+      values.push(`%${busqueda_texto}%`);
+      const textIndex = values.length;
+      whereClauses.push(
+        `(
+          a.paciente_nombre ILIKE $${textIndex} OR
+          a.num_reporte_local ILIKE $${textIndex} OR
+          cc.nombre ILIKE $${textIndex} OR
+          ta.nombre ILIKE $${textIndex} OR
+          a.hospital_destino ILIKE $${textIndex}
+        )`
+      );
+    }
+    
+    // Filtros Avanzados (IDs de catálogos)
+    if (id_tipo_activacion) {
+      values.push(id_tipo_activacion);
+      whereClauses.push(`a.id_tipo_activacion = $${values.length}`);
+    }
+    if (id_causa_clinica) {
+      values.push(id_causa_clinica);
+      whereClauses.push(`a.id_causa_clinica = $${values.length}`);
+    }
+    if (id_unidad_asignada) {
+      values.push(id_unidad_asignada);
+      whereClauses.push(`a.id_unidad_asignada = $${values.length}`);
+    }
+
+    // Filtro de Rango de Edad
+    if (edad_min) {
+      values.push(edad_min);
+      whereClauses.push(`a.paciente_edad >= $${values.length}`);
+    }
+    if (edad_max) {
+      values.push(edad_max);
+      whereClauses.push(`a.paciente_edad <= $${values.length}`);
+    }
+
+    // ¡NUEVO! Filtro por Tipo de Lesión
+    if (id_tipo_lesion) {
+      // 1. Añadimos el JOIN a la tabla de lesiones (SOLO SI SE USA EL FILTRO)
+      // Usamos INNER JOIN porque solo queremos registros QUE TENGAN esa lesión
+      joins += ` INNER JOIN lesiones_activacion AS la ON a.id = la.id_activacion`;
+      
+      // 2. Añadimos la condición al WHERE
+      values.push(id_tipo_lesion);
+      whereClauses.push(`la.id_tipo_lesion = $${values.length}`);
+    }
+
+    // --- Armado de la consulta final ---
+    
+    // Usamos DISTINCT ON (a.id) para evitar registros duplicados
+    // (por si un paciente tiene 2 lesiones que coinciden con el filtro)
     let query = `
-      SELECT 
+      SELECT DISTINCT ON (a.num_reporte_local)
         a.id,
         a.num_reporte_local,
         a.fecha_activacion,
@@ -473,34 +559,30 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         a.paciente_nombre,
         a.paciente_edad,
         a.paciente_sexo,
-        a.hospital_destino,                   -- <-- AÑADIDO: Para la columna Hospital
+        a.hospital_destino,                   -- <-- Corregido: Ya se envía
         
         ta.nombre AS tipo_activacion,
         cc.nombre AS causa_clinica,
-        ua.nombre AS unidad_asignada_nombre,  -- <-- AÑADIDO: Para la columna Unidad
+        ua.nombre AS unidad_asignada_nombre,  -- <-- Corregido: Ya se envía
         
-        a.id_tipo_activacion,                 -- <-- AÑADIDO: Para el filtro
-        a.id_causa_clinica,                   -- <-- AÑADIDO: Para el filtro
-        a.id_unidad_asignada                  -- <-- AÑADIDO: Para el filtro
+        a.id_tipo_activacion,                 -- <-- Corregido: Ya se envía
+        a.id_causa_clinica,                   -- <-- Corregido: Ya se envía
+        a.id_unidad_asignada                  -- <-- Corregido: Ya se envía
       FROM 
         activaciones AS a
-      LEFT JOIN 
-        tipo_activacion AS ta ON a.id_tipo_activacion = ta.id
-      LEFT JOIN 
-        causa_clinica AS cc ON a.id_causa_clinica = cc.id
-      LEFT JOIN 
-        unidad_asignada AS ua ON a.id_unidad_asignada = ua.id -- <-- AÑADIDO: El JOIN para Unidad
+      ${joins}
     `;
-    const values = [];
-    if (scope === 'today') {
-      query += ' WHERE a.fecha_activacion = CURRENT_DATE ';
-    } else if (fecha_inicio && fecha_fin) {
-      values.push(fecha_inicio, fecha_fin);
-      query += ' WHERE a.fecha_activacion BETWEEN $1 AND $2 ';
+
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
-    query += ' ORDER BY a.fecha_activacion DESC, a.hora_activacion DESC;';
+
+    // Ordenamos por Folio (YYMMNNN) descendente (el más nuevo primero)
+    query += ' ORDER BY a.num_reporte_local DESC;';
+
     const result = await pool.query(query, values);
     res.json(result.rows);
+    
   } catch (err) {
     console.error('Error al obtener las activaciones:', err);
     res.status(500).json({ error: 'Error interno al consultar los registros.' });

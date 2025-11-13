@@ -126,20 +126,23 @@ body {
   background-color: var(--bg-light);
 }
 
+/* --- CAMBIOS PARA EL SIDEBAR FIJO --- */
 .dashboard-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;     /* <-- CAMBIO: de 'min-height' a 'height' */
+  overflow: hidden;    /* <-- AÑADIDO: Evita que el layout principal tenga scroll */
 }
 
 .dashboard-body {
   display: flex;
   flex: 1;
+  overflow: hidden;    /* <-- AÑADIDO: Evita que el body se desborde */
 }
 
 .dashboard-main {
   flex: 1;
   padding: 2.5rem;
-  overflow-y: auto;
+  overflow-y: auto;  /* <-- CLAVE: Solo esta área tendrá scroll */
 }
 </style>
