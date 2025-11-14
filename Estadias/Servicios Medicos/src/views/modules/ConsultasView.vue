@@ -134,6 +134,20 @@
             </div>
 
             <div class="filter-group">
+              <label class="filter-label">Tipo de Lesión</label>
+              <select 
+                class="form-control form-control-sm" 
+                v-model="filtrosAvanzados.id_tipo_lesion"
+                @change="buscarActivaciones" 
+              >
+                <option value="">Todas las lesiones</option>
+                <option v-for="lesion in catalogos.tipos_lesion" :key="lesion.id" :value="lesion.id">
+                  {{ lesion.nombre }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-group">
               <label class="filter-label">Causa Clínica</label>
               <select 
                 class="form-control form-control-sm" 
@@ -654,6 +668,7 @@ export default {
       tipo_activacion: '',
       causa_clinica: '',
       unidad_asignada: '',
+      id_tipo_lesion: '', // <-- AÑADIR ESTA LÍNEA
       edad_min: '',
       edad_max: ''
     });
@@ -753,22 +768,37 @@ export default {
         }
     };
 
-    const buscarActivaciones = async () => {
-      cargando.value = true;
-      error.value = null;
-      resultados.value = [];
-      try {
-        const response = await api.get('/activaciones', {
-          params: filtros.value 
-        });
-        resultados.value = response.data;
-      } catch (err) {
-        console.error("Error al buscar activaciones:", err);
-        error.value = 'No se pudieron cargar los registros. Verifica tu conexión e intenta nuevamente.';
-      } finally {
-        cargando.value = false;
-      }
-    };
+        const buscarActivaciones = async () => {
+          cargando.value = true;
+          error.value = null;
+          resultados.value = [];
+
+          // 1. Combinar TODOS los filtros
+          const params = {
+            ...filtros.value, // fecha_inicio, fecha_fin
+            ...filtrosAvanzados.value, // tipo_activacion, causa_clinica, etc.
+            busqueda_texto: busquedaTexto.value // El texto de búsqueda
+          };
+
+          // 2. Limpiar valores vacíos para no enviar basura a la API
+          Object.keys(params).forEach(key => {
+            if (params[key] === null || params[key] === '') {
+              delete params[key];
+            }
+          });
+
+          try {
+            // 3. Enviar la solicitud GET con todos los parámetros
+            console.log('Enviando filtros a la API:', params); // Para depuración
+            const response = await api.get('/activaciones', { params });
+            resultados.value = response.data;
+          } catch (err) {
+            console.error("Error al buscar activaciones:", err);
+            error.value = 'No se pudieron cargar los registros.';
+          } finally {
+            cargando.value = false;
+          }
+        };
 
     const setFiltroRapido = (periodo) => {
       const hoy = new Date();
@@ -1770,7 +1800,7 @@ export default {
     right: -500px;
   }
   
-  .results-section-improved.compressed {
+  .results-section-improved.compressed {  
     width: calc(100% - 500px);
   }
 }
