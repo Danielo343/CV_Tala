@@ -504,9 +504,7 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         `(
           a.paciente_nombre ILIKE $${textIndex} OR
           a.num_reporte_local ILIKE $${textIndex} OR
-          cc.nombre ILIKE $${textIndex} OR
-          ta.nombre ILIKE $${textIndex} OR
-          a.hospital_destino ILIKE $${textIndex}
+          a.num_reporte_externo ILIKE $${textIndex} 
         )`
       );
     }
@@ -554,6 +552,7 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
       SELECT DISTINCT ON (a.num_reporte_local)
         a.id,
         a.num_reporte_local,
+        a.num_reporte_externo,
         a.fecha_activacion,
         a.hora_activacion,
         a.paciente_nombre,

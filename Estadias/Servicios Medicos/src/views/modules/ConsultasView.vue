@@ -26,7 +26,7 @@
           <h3><i class="fas fa-filter me-2"></i>Filtros de Búsqueda</h3>
           <div class="header-actions">
             <button 
-              class="btn btn-sm btn-outline-secondary" 
+              class="btn btn-sm btn-outline-danger" 
               @click="resetFiltros"
               :disabled="cargando"
             >
@@ -46,20 +46,18 @@
       <div class="panel-body-compact">
         <!-- Búsqueda Rápida en Tiempo Real -->
         <div class="search-real-time">
-          <div class="search-input-container">
-            <i class="fas fa-search search-icon"></i>
-            <input 
-              type="text" 
-              class="search-input" 
-              placeholder="Buscar por nombre, folio, causa..."
-              v-model="busquedaTexto"
-              @input="buscarEnTiempoReal"
-              :disabled="cargando"
-            >
-            <div v-if="busquedaTexto" class="search-clear" @click="limpiarBusqueda">
-              <i class="fas fa-times"></i>
-            </div>
+        <div class="search-input-container">
+          <i class="fas fa-search search-icon"></i>
+          <input 
+            type="text" 
+            class="search-input" 
+            placeholder="Buscar por nombre, folio local o externo..."
+            v-model="busquedaTexto"
+          >
+          <div v-if="busquedaTexto" class="search-clear" @click="limpiarBusqueda">
+            <i class="fas fa-times"></i>
           </div>
+        </div>
         </div>
 
         <!-- Filtros Principales -->
@@ -123,8 +121,8 @@
               <label class="filter-label">Tipo de Activación</label>
               <select 
                 class="form-control form-control-sm" 
-                v-model="filtrosAvanzados.tipo_activacion"
-                @change="aplicarFiltrosAvanzados"
+                v-model="filtrosAvanzados.id_tipo_activacion"
+                @change="buscarActivaciones"
               >
                 <option value="">Todos los tipos</option>
                 <option v-for="tipo in catalogos.tipos_activacion" :key="tipo.id" :value="tipo.id">
@@ -151,8 +149,8 @@
               <label class="filter-label">Causa Clínica</label>
               <select 
                 class="form-control form-control-sm" 
-                v-model="filtrosAvanzados.causa_clinica"
-                @change="aplicarFiltrosAvanzados"
+                v-model="filtrosAvanzados.id_causa_clinica"
+                @change="buscarActivaciones"
               >
                 <option value="">Todas las causas</option>
                 <option v-for="causa in catalogos.causa_clinica" :key="causa.id" :value="causa.id">
@@ -165,8 +163,8 @@
               <label class="filter-label">Unidad Asignada</label>
               <select 
                 class="form-control form-control-sm" 
-                v-model="filtrosAvanzados.unidad_asignada"
-                @change="aplicarFiltrosAvanzados"
+                v-model="filtrosAvanzados.id_unidad_asignada"
+                @change="buscarActivaciones"
               >
                 <option value="">Todas las unidades</option>
                 <option v-for="unidad in catalogos.unidades" :key="unidad.id" :value="unidad.id">
@@ -183,7 +181,7 @@
                   class="form-control form-control-sm" 
                   placeholder="Mín" 
                   v-model="filtrosAvanzados.edad_min"
-                  @change="aplicarFiltrosAvanzados"
+                  @change="buscarActivaciones"
                 >
                 <span class="age-separator">-</span>
                 <input 
@@ -191,7 +189,7 @@
                   class="form-control form-control-sm" 
                   placeholder="Máx" 
                   v-model="filtrosAvanzados.edad_max"
-                  @change="aplicarFiltrosAvanzados"
+                  @change="buscarActivaciones"
                 >
               </div>
             </div>
@@ -256,6 +254,7 @@
                 <thead>
                   <tr>
                     <th class="folio-col">Folio</th>
+                    <th class="folio-externo-col">F. Externo</th>
                     <th class="fecha-col">Fecha/Hora</th>
                     <th class="paciente-col">Paciente</th>
                     <th class="edad-col">Edad</th>
@@ -275,6 +274,12 @@
                   >
                     <td class="folio-cell-improved">
                       <div class="folio-badge-improved">{{ activacion.num_reporte_local }}</div>
+                    </td>
+                    <td class="folio-externo-cell">
+                      <span v-if="activacion.num_reporte_externo" class="folio-externo-badge">
+                        {{ activacion.num_reporte_externo }}
+                      </span>
+                      <span v-else class="text-muted">N/A</span>
                     </td>
                     <td class="fecha-cell-improved">
                       <div class="fecha-text">{{ formatDateForDisplay(activacion.fecha_activacion) }}</div>
@@ -488,9 +493,9 @@
             <div v-else-if="activacionSeleccionada">
               <div class="detalle-header">
                 <h3>Folio: <span class="text-primary">{{ activacionSeleccionada.num_reporte_local }}</span></h3>
-                <p class="text-muted">
-                  Capturado el: {{ formatDateForDisplay(activacionSeleccionada.fecha_captura) }} a las {{ activacionSeleccionada.hora_captura }}
-                </p>
+               <p class="text-muted">
+                Capturado el: {{ formatDateForDisplay(activacionSeleccionada.fecha_captura) }} a las {{ activacionSeleccionada.hora_captura ? activacionSeleccionada.hora_captura.substring(0, 5) : 'N/A' }}
+              </p>
               </div>
 
               <div class="detalle-seccion card">
@@ -608,7 +613,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import { useStore } from 'vuex'; 
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
@@ -665,9 +670,9 @@ export default {
     const busquedaTexto = ref('');
     const mostrarFiltrosAvanzados = ref(false);
     const filtrosAvanzados = ref({
-      tipo_activacion: '',
-      causa_clinica: '',
-      unidad_asignada: '',
+      id_tipo_activacion: '',
+      id_causa_clinica: '',
+      id_unidad_asignada: '',
       id_tipo_lesion: '', // <-- AÑADIR ESTA LÍNEA
       edad_min: '',
       edad_max: ''
@@ -692,6 +697,7 @@ export default {
     const datosParaEditar = ref(null); 
     const mensajeEdicion = ref(''); 
     const tipoMensajeEdicion = ref('');
+    const debounceTimer = ref(null);
 
     // --- Computadas ---
     const periodoSeleccionado = computed(() => {
@@ -706,48 +712,26 @@ export default {
       return Object.values(filtrosAvanzados.value).some(val => val !== '');
     });
 
-    const resultadosFiltrados = computed(() => {
-      if (!busquedaTexto.value && !filtrosAvanzadosActivos.value) {
-        return resultados.value;
-      }
+const resultadosFiltrados = computed(() => {
+  // Ya no filtramos aquí. 
+  // La lista "resultados.value" que viene de la API es la única fuente de verdad.
+  return resultados.value;
+});
 
-      return resultados.value.filter(activacion => {
-        // Filtro de búsqueda de texto
-          let coincideTexto = true;
-            if (busquedaTexto.value) {
-              const texto = normalizeText(busquedaTexto.value); // <-- USA LA FUNCIÓN
-
-              coincideTexto = 
-                (normalizeText(activacion.paciente_nombre).includes(texto)) ||
-                (normalizeText(activacion.num_reporte_local).includes(texto)) ||
-                (normalizeText(activacion.causa_clinica).includes(texto)) ||
-                (normalizeText(activacion.tipo_activacion).includes(texto)) ||
-                (normalizeText(activacion.hospital_destino).includes(texto));
-            }
-
-        // Filtros avanzados
-        let coincideAvanzado = true;
-        if (filtrosAvanzadosActivos.value) {
-          if (filtrosAvanzados.value.tipo_activacion && activacion.id_tipo_activacion) {
-            coincideAvanzado = coincideAvanzado && activacion.id_tipo_activacion == filtrosAvanzados.value.tipo_activacion;
-          }
-          if (filtrosAvanzados.value.causa_clinica && activacion.id_causa_clinica) {
-            coincideAvanzado = coincideAvanzado && activacion.id_causa_clinica == filtrosAvanzados.value.causa_clinica;
-          }
-          if (filtrosAvanzados.value.unidad_asignada && activacion.id_unidad_asignada) {
-            coincideAvanzado = coincideAvanzado && activacion.id_unidad_asignada == filtrosAvanzados.value.unidad_asignada;
-          }
-          if (filtrosAvanzados.value.edad_min && activacion.paciente_edad) {
-            coincideAvanzado = coincideAvanzado && activacion.paciente_edad >= parseInt(filtrosAvanzados.value.edad_min);
-          }
-          if (filtrosAvanzados.value.edad_max && activacion.paciente_edad) {
-            coincideAvanzado = coincideAvanzado && activacion.paciente_edad <= parseInt(filtrosAvanzados.value.edad_max);
-          }
-        }
-
-        return coincideTexto && coincideAvanzado;
-      });
-    });
+watch(busquedaTexto, (newValue, oldValue) => {
+  // Limpiar el temporizador anterior si existe
+  if (debounceTimer.value) {
+    clearTimeout(debounceTimer.value);
+  }
+  
+  // Iniciar un nuevo temporizador
+  debounceTimer.value = setTimeout(() => {
+    // Solo buscar si el componente no está ya "cargando" algo
+    if (!cargando.value) {
+      buscarActivaciones();
+    }
+  }, 250); // Espera 400ms después de que el usuario deja de teclear
+});
 
     // Datos para filtros rápidos
     const periodosRapidos = ref([
@@ -800,29 +784,43 @@ export default {
           }
         };
 
-    const setFiltroRapido = (periodo) => {
-      const hoy = new Date();
-      let inicio = new Date();
-      let fin = new Date(hoy);
-      filtroActivo.value = periodo;
-      switch (periodo) {
-        case 'hoy':
-          inicio = new Date(hoy);
-          fin = new Date(hoy);
-          break;
-        case 'semana':
-          inicio.setDate(hoy.getDate() - 6);
-          break;
-        case 'mes':
-          inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-          break;
-        case 'anio':
-          inicio = new Date(hoy.getFullYear(), 0, 1);
-          break;
+const setFiltroRapido = (periodo) => {
+      // 1. Comprueba si el usuario está presionando el botón que ya está activo
+      if (filtroActivo.value === periodo) {
+        // 2. Si es así, desactívalo (ponlo en null)
+        filtroActivo.value = null;
+        // 3. Limpia las fechas
+        filtros.value.fecha_inicio = '';
+        filtros.value.fecha_fin = '';
+        // 4. Vuelve a buscar con las fechas vacías (respetando otros filtros)
+        buscarActivaciones();
+        
+      } else {
+        // 5. Si es un botón nuevo, haz la lógica original:
+        const hoy = new Date();
+        let inicio = new Date();
+        let fin = new Date(hoy);
+        filtroActivo.value = periodo; // Activa el nuevo filtro
+        
+        switch (periodo) {
+          case 'hoy':
+            inicio = new Date(hoy);
+            fin = new Date(hoy);
+            break;
+          case 'semana':
+            inicio.setDate(hoy.getDate() - 6);
+            break;
+          case 'mes':
+            inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            break;
+          case 'anio':
+            inicio = new Date(hoy.getFullYear(), 0, 1);
+            break;
+        }
+        filtros.value.fecha_inicio = toISODate(inicio);
+        filtros.value.fecha_fin = toISODate(fin);
+        buscarActivaciones();
       }
-      filtros.value.fecha_inicio = toISODate(inicio);
-      filtros.value.fecha_fin = toISODate(fin);
-      buscarActivaciones();
     };
 
     const resetFiltros = () => {
@@ -835,9 +833,10 @@ export default {
       filtroActivo.value = null;
       busquedaTexto.value = '';
       filtrosAvanzados.value = {
-        tipo_activacion: '',
-        causa_clinica: '',
-        unidad_asignada: '',
+        id_tipo_activacion: '',
+        id_causa_clinica: '',
+        id_unidad_asignada: '',
+        id_tipo_lesion: '',
         edad_min: '',
         edad_max: ''
       };
@@ -1036,6 +1035,13 @@ export default {
         const state = JSON.parse(savedState);
         filtros.value = state.filtros;
         localStorage.removeItem('consultaReturnState');
+      }
+    });
+
+    onUnmounted(() => {
+      // Si hay un temporizador de debounce activo, cancélelo.
+      if (debounceTimer.value) {
+        clearTimeout(debounceTimer.value);
       }
     });
 
@@ -1482,6 +1488,7 @@ export default {
   font-size: 0.7rem;
   text-align: center;
   display: inline-block;
+  white-space: nowrap;
 }
 
 .fecha-cell-improved {
@@ -1568,6 +1575,33 @@ export default {
 .action-btn-compact {
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
+}
+
+.folio-externo-col {
+  width: 120px; /* Le damos un ancho fijo */
+}
+
+.folio-externo-cell {
+  vertical-align: middle;
+}
+
+/* Estilo para el nuevo badge gris */
+.folio-externo-badge {
+  background: #6c757d; /* Fondo gris (como otros badges) */
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-align: center;
+  display: inline-block;
+  white-space: nowrap; /* Previene el salto de línea */
+}
+
+/* Estilo para el texto "N/A" */
+.folio-externo-cell .text-muted {
+  font-size: 0.8rem;
+  color: #6c757d;
 }
 
 /* Footer de Tabla */
@@ -1880,4 +1914,4 @@ export default {
     flex-direction: column;
   }
 }
-</style>  
+</style>

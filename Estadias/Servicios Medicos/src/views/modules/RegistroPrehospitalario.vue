@@ -174,9 +174,9 @@
             <div v-else-if="activacionSeleccionada">
               <div class="detalle-header">
                 <h3>Folio: <span class="text-primary">{{ activacionSeleccionada.num_reporte_local }}</span></h3>
-                <p class="text-muted">
-                  Capturado el: {{ formatDateForDisplay(activacionSeleccionada.fecha_captura) }} a las {{ activacionSeleccionada.hora_captura }}
-                </p>
+              <p class="text-muted">
+                Capturado el: {{ formatDateForDisplay(activacionSeleccionada.fecha_captura) }} a las {{ activacionSeleccionada.hora_captura ? activacionSeleccionada.hora_captura.substring(0, 5) : 'N/A' }}
+              </p>
               </div>
 
               <div class="detalle-seccion card">
