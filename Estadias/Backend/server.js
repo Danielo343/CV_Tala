@@ -46,7 +46,7 @@ async function getCatalogos() {
       tipos_activacion, causa_clinica, agentes_causantes,
       causas_traumaticas, unidades, estados_traslado,
       estados_pupilas, estados_piel, tipos_lesion, ubicaciones_lesion,
-      tipos_evento, categorias_evento, personal
+      tipos_evento, categorias_evento, personal, hospitales
     ] = await Promise.all([
       pool.query('SELECT * FROM tipo_activacion ORDER BY id'),
       pool.query('SELECT * FROM causa_clinica ORDER BY id'),
@@ -61,6 +61,7 @@ async function getCatalogos() {
       pool.query('SELECT * FROM tipo_evento ORDER BY id'),
       pool.query('SELECT * FROM categoria_evento ORDER BY id'),
       pool.query('SELECT id, nombre_completo AS nombre FROM usuarios ORDER BY nombre_completo'),
+      pool.query('SELECT * FROM catalogo_hospitales ORDER BY nombre'),
     ]);
 
     // Función helper para crear un Map (ej: '1' -> 'Accidente')
@@ -82,6 +83,7 @@ async function getCatalogos() {
         tipos_evento: tipos_evento.rows,
         categorias: categorias_evento.rows,
         personal: personal.rows,
+        hospitales: hospitales.rows,
       },
       // Creamos Mapas para búsqueda rápida de IDs
       maps: {
@@ -183,6 +185,12 @@ const adminOnly = (req, res, next) => {
         res.status(403).json({ message: 'Acceso denegado: Se requiere rol de Administrador' });
     }
 };
+
+app.get('/api/auth/verify', verificarToken, (req, res) => {
+  // Si el middleware 'verificarToken' pasa, el token es válido.
+  // Solo necesitamos enviar una respuesta exitosa.
+  res.json({ message: 'Token válido' });
+});
 
 // --- FUNCIÓN HELPER PARA LA BITÁCORA (Sin cambios) ---
 const registrarHistorial = async (id_usuario, nombre_usuario, accion, tipo_entidad, id_entidad, detalles) => {
@@ -358,6 +366,7 @@ app.get('/api/catalogos', verificarToken, async (req, res) => {
       tipos_evento: catalogs.listas.tipos_evento,
       categorias: catalogs.listas.categorias,
       personal: catalogs.listas.personal,
+      hospitales: catalogs.listas.hospitales,
       // Hacemos un mapeo para las unidades de transporte (usado en eventos)
       unidades_transporte: catalogs.listas.unidades.map(u => ({ id: u.id, codigo: u.nombre, descripcion: u.nombre }))
     });
@@ -904,9 +913,33 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
 
 // Ver eventos (Sin cambios)
 app.get('/api/eventos', verificarToken, async (req, res) => {
-  // ... (tu código de GET /api/eventos no cambia)
+  const { busqueda_texto, id_tipo_evento } = req.query;
+  
   try {
-    const query = `
+    let values = [];
+    let whereClauses = [];
+
+    // Filtro de Búsqueda de Texto
+    if (busqueda_texto) {
+      values.push(`%${busqueda_texto}%`);
+      const textIndex = values.length;
+      whereClauses.push(
+        `(
+          e.nombre_evento ILIKE $${textIndex} OR
+          e.lugar ILIKE $${textIndex} OR
+          e.descripcion ILIKE $${textIndex}
+        )`
+      );
+    }
+    
+    // Filtro por ID de Tipo de Evento
+    if (id_tipo_evento) {
+      values.push(id_tipo_evento);
+      whereClauses.push(`e.id_tipo_evento = $${values.length}`);
+    }
+
+    // Consulta base (la misma que ya tenías)
+    let query = `
       SELECT 
         e.id, e.nombre_evento, e.fecha, e.hora_inicio, e.estado, e.lugar, 
         e.descripcion, e.participantes_esperados, e.id_tipo_evento, e.id_responsable,
@@ -924,11 +957,18 @@ app.get('/api/eventos', verificarToken, async (req, res) => {
         tipo_evento AS te ON e.id_tipo_evento = te.id
       LEFT JOIN 
         usuarios AS u ON e.id_responsable = u.id
-      ORDER BY 
-        e.fecha DESC, e.hora_inicio DESC;
     `;
-    const result = await pool.query(query);
+
+    // Añadimos los filtros si existen
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
+    query += ' ORDER BY e.fecha DESC, e.hora_inicio DESC;';
+
+    const result = await pool.query(query, values);
     res.json(result.rows);
+    
   } catch (err) {
     console.error('❌ Error al obtener la lista de eventos:', err);
     res.status(500).json({ error: 'Error interno al consultar los eventos.' });
@@ -1326,6 +1366,135 @@ app.get('/api/historial', [verificarToken, adminOnly], async (req, res) => {
   } catch (err) {
     console.error('Error al obtener historial:', err);
     res.status(500).json({ error: 'Error interno al consultar el historial' });
+  }
+});
+
+const getFechasReporte = (req) => {
+let { fecha_inicio, fecha_fin } = req.query;
+  // Usamos un rango lo suficientemente amplio para cubrir cualquier registro
+  if (!fecha_inicio || !fecha_fin) {
+    return ['2000-01-01', '2100-12-31'];
+  }
+  
+  return [fecha_inicio, fecha_fin];
+};
+// --- RUTAS PARA REPORTES DE ACTIVACIONES ---
+// 1. Gráfica: Origen de Activación (image_d0ffc8.png)
+app.get('/api/reportes/origen', [verificarToken, adminOnly], async (req, res) => {
+  const [fecha_inicio, fecha_fin] = getFechasReporte(req);
+  try {
+    const query = `
+      SELECT 
+        COALESCE(T.nombre, 'Sin Asignar') AS nombre, 
+        COUNT(A.id) AS total 
+      FROM activaciones A 
+      LEFT JOIN tipo_activacion T ON A.id_tipo_activacion = T.id 
+      WHERE A.fecha_activacion BETWEEN $1 AND $2 
+      GROUP BY nombre 
+      ORDER BY total DESC;
+    `;
+    const result = await pool.query(query, [fecha_inicio, fecha_fin]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error en reporte /origen:', err);
+    res.status(500).json({ error: 'Error al generar reporte de origen' });
+  }
+});
+
+// 2. Gráfica: Urgencias Médicas (Imagen...9eac2d29.jpg)
+app.get('/api/reportes/causas-clinicas', [verificarToken, adminOnly], async (req, res) => {
+  const [fecha_inicio, fecha_fin] = getFechasReporte(req);
+  try {
+    const query = `
+      SELECT 
+        C.nombre, 
+        COUNT(A.id) AS total 
+      FROM activaciones A 
+      JOIN causa_clinica C ON A.id_causa_clinica = C.id 
+      WHERE A.fecha_activacion BETWEEN $1 AND $2 
+      GROUP BY C.nombre 
+      HAVING COUNT(A.id) > 0 
+      ORDER BY total DESC;
+    `;
+    const result = await pool.query(query, [fecha_inicio, fecha_fin]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error en reporte /causas-clinicas:', err);
+    res.status(500).json({ error: 'Error al generar reporte de causas clínicas' });
+  }
+});
+
+// 3. Gráfica: Emergencias Traumatológicas (Imagen...c5a9596a.jpg)
+app.get('/api/reportes/causas-traumaticas', [verificarToken, adminOnly], async (req, res) => {
+  const [fecha_inicio, fecha_fin] = getFechasReporte(req);
+  try {
+    const query = `
+      SELECT 
+        C.nombre, 
+        COUNT(A.id_activacion) AS total 
+      FROM activacion_causas_traumaticas A 
+      JOIN causa_traumatica_especifica C ON A.id_causa_traumatica_especifica = C.id 
+      JOIN activaciones Act ON A.id_activacion = Act.id 
+      WHERE Act.fecha_activacion BETWEEN $1 AND $2 
+      GROUP BY C.nombre 
+      HAVING COUNT(A.id_activacion) > 0 
+      ORDER BY total DESC;
+    `;
+    const result = await pool.query(query, [fecha_inicio, fecha_fin]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error en reporte /causas-traumaticas:', err);
+    res.status(500).json({ error: 'Error al generar reporte de causas traumáticas' });
+  }
+});
+
+// 4. Gráfica: Destino Posterior (image_d103a7.png)
+app.get('/api/reportes/destinos', [verificarToken, adminOnly], async (req, res) => {
+  const [fecha_inicio, fecha_fin] = getFechasReporte(req);
+  try {
+    const query = `
+      -- Parte 1: Traslados
+      (
+        SELECT 
+          CASE 
+            WHEN hospital_destino IN (SELECT nombre FROM catalogo_hospitales WHERE nombre != 'Otro') THEN hospital_destino
+            ELSE 'Otros Hospitales' 
+          END AS nombre,
+          COUNT(id) AS total,
+          -- CORRECCIÓN: Usamos STRING_AGG directamente, es seguro y válido siempre.
+          STRING_AGG(DISTINCT hospital_destino, ', ') AS desglose
+        FROM activaciones 
+        WHERE requirio_traslado = true 
+          AND hospital_destino IS NOT NULL 
+          AND fecha_activacion BETWEEN $1 AND $2 
+        GROUP BY 
+          CASE 
+            WHEN hospital_destino IN (SELECT nombre FROM catalogo_hospitales WHERE nombre != 'Otro') THEN hospital_destino
+            ELSE 'Otros Hospitales' 
+          END
+      )
+      UNION ALL
+      -- Parte 2: No Traslados
+      (
+        SELECT 
+          T.nombre AS nombre, 
+          COUNT(A.id) AS total,
+          NULL AS desglose
+        FROM activaciones A 
+        JOIN estado_traslado T ON A.id_estado_traslado = T.id 
+        WHERE A.requirio_traslado = false 
+          AND A.id_estado_traslado IS NOT NULL 
+          AND A.fecha_activacion BETWEEN $1 AND $2 
+        GROUP BY T.nombre
+      )
+      ORDER BY total DESC;
+    `;
+    const result = await pool.query(query, [fecha_inicio, fecha_fin]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error en reporte /destinos:', err);
+    // Agregamos el mensaje de error real para que lo veas en la terminal si vuelve a fallar
+    res.status(500).json({ error: 'Error al generar reporte de destinos', details: err.message });
   }
 });
 

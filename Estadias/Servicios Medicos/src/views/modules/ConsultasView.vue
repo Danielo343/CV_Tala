@@ -815,6 +815,8 @@ const setFiltroRapido = (periodo) => {
             break;
           case 'anio':
             inicio = new Date(hoy.getFullYear(), 0, 1);
+            // Mes 11 es Diciembre, día 31
+            fin = new Date(hoy.getFullYear(), 11, 31); 
             break;
         }
         filtros.value.fecha_inicio = toISODate(inicio);

@@ -8,7 +8,7 @@ import RegistroPrehospitalario from '@/views/modules/RegistroPrehospitalario.vue
 import ConsultasView from '@/views/modules/ConsultasView.vue'
 import EventosView from '@/views/modules/EventosView.vue'
 import GestionUsuarios from '@/views/modules/GestionUsuarios.vue'
-// --- ¡NUEVO! Importamos la nueva vista de historial ---
+import ReportesView from '@/views/modules/ReportesView.vue'
 import HistorialView from '@/views/modules/HistorialView.vue'
 
 
@@ -57,7 +57,17 @@ const routes = [
           requiresAuth: true,
           adminOnly: true // Esta ruta también requiere ser admin
         }
-      }
+      },
+      // --- ¡NUEVA RUTA DE REPORTES! ---
+      {
+        path: 'reportes', // La ruta será "/reportes"
+        name: 'Reportes',
+        component: ReportesView,
+        meta: { 
+          requiresAuth: true,
+          adminOnly: true // Solo los admins pueden ver esto
+        }
+      },
       // --- FIN DE RUTA NUEVA ---
     ]
   },

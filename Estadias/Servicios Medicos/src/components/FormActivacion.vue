@@ -261,9 +261,19 @@
             <label class="form-check-label" for="checkTrasladoForm">¿Se trasladó?</label>
           </div>
           <div v-if="formulario.requirio_traslado" class="row">
-              <div class="col-md-12 mb-3">
+              <div :class="hospitalEsOtro ? 'col-md-6 mb-3' : 'col-md-12 mb-3'">
                   <label class="form-label">Hospital Destino</label>
-                  <input type="text" v-model="formulario.hospital_destino" class="form-control" placeholder="Nombre del hospital" required>
+                  <select v-model="formulario.hospital_destino" class="form-select" required>
+                    <option value="" disabled>Seleccione un hospital</option>
+                    <option v-for="hosp in catalogs.hospitales" :key="hosp.id" :value="hosp.nombre">
+                      {{ hosp.nombre }}
+                    </option>
+                  </select>
+              </div>
+              
+              <div v-if="hospitalEsOtro" class="col-md-6 mb-3">
+                  <label class="form-label">Especifique "Otro" Hospital *</label>
+                  <input type="text" v-model="hospitalOtroTexto" class="form-control" placeholder="Nombre del hospital" required>
               </div>
           </div>
           
@@ -380,35 +390,140 @@ const emit = defineEmits(['save', 'cancel', 'save-error']);
 const formulario = ref(initialFormState());
 const tieneReporteExterno = ref(false);
 const formElement = ref(null);
+const hospitalOtroTexto = ref('');
 const currentDate = computed(() => new Date().toISOString().split('T')[0]);
 const currentTime = computed(() => new Date().toTimeString().split(' ')[0].substring(0, 5));
 
 // --- NUEVO: Computada para saber si estamos editando ---
 const isEditing = computed(() => !!props.initialData);
 
+const hospitalEsOtro = computed(() => {
+  return formulario.value.hospital_destino === 'Otro';
+  });
+
 // --- Lógica de llenado del formulario ---
 watch(() => props.initialData, (newData) => {
   console.log("Datos iniciales recibidos por el formulario:", newData);
   if (newData) {
-    // Modo Edición: Copiamos los datos
     formulario.value = JSON.parse(JSON.stringify(newData));
     
-    // Ajustamos los datos que no son 1 a 1
-    // 1. Causas Traumáticas (el form espera un array de IDs)
+    // Ajustes existentes
     formulario.value.id_causas_traumaticas = (newData.causas_traumaticas || []).map(c => c.id);
-
-    // 2. Asegurarnos que 'evaluacion' y 'lesiones' no sean null
     formulario.value.evaluacion = newData.evaluacion || initialFormState().evaluacion;
     formulario.value.lesiones = newData.lesiones || initialFormState().lesiones;
-
-    // 3. Sincronizar el switch de reporte externo
     tieneReporteExterno.value = formulario.value.origen_reporte !== 'Local';
+
+    // --- NUEVA LÓGICA PARA CARGAR "OTRO" HOSPITAL ---
+    if (newData.hospital_destino && props.catalogs.hospitales) {
+      // Comprobamos si el hospital guardado está en la lista estándar
+      const hospitalEstandar = props.catalogs.hospitales.find(h => h.nombre === newData.hospital_destino);
+      
+      if (hospitalEstandar) {
+        // Está en la lista, lo seleccionamos (v-model lo hace solo)
+        hospitalOtroTexto.value = '';
+      } else {
+        // No está en la lista, es un "Otro"
+        hospitalOtroTexto.value = newData.hospital_destino; // Llenamos el campo de texto
+        formulario.value.hospital_destino = 'Otro'; // Seleccionamos "Otro" en el dropdown
+      }
+    }
+    // --- FIN LÓGICA ---
+
   } else {
-    // Modo Creación: Reseteamos
+    // Modo Creación
     formulario.value = initialFormState();
+    hospitalOtroTexto.value = ''; // Resetear
     tieneReporteExterno.value = false;
   }
 }, { immediate: true });
+
+watch(hospitalEsOtro, (esOtro) => {
+  if (!esOtro) {
+    hospitalOtroTexto.value = '';
+  }
+});
+
+const findCatalogId = (catalogName, namePart) => {
+  const catalog = props.catalogs[catalogName];
+  if (!catalog) {
+    console.warn(`Catálogo "${catalogName}" no encontrado.`);
+    return null;
+  }
+  const item = catalog.find(i => i.nombre.toLowerCase().includes(namePart.toLowerCase()));
+  return item ? item.id : null;
+};
+
+watch(() => formulario.value.id_estado_traslado, (nuevoEstadoId) => {
+  if (!nuevoEstadoId || !props.catalogs.estados_traslado) return;
+
+  const estadoSeleccionado = props.catalogs.estados_traslado.find(e => e.id === nuevoEstadoId);
+  if (!estadoSeleccionado) return;
+
+  const estadoNombre = estadoSeleccionado.nombre.toLowerCase();
+  
+  // Limpiar selecciones previas
+  formulario.value.id_agente_causante_general = null;
+  formulario.value.id_causa_clinica = null;
+  formulario.value.id_causas_traumaticas = [];
+
+  // --- Lógica de decisión basada en tus catálogos ---
+
+  // 1. Fallecido por Enfermedad
+  if (estadoNombre.includes('enfermedad')) {
+    console.log('Detectado: Enfermedad. Limpiando campos de trauma.');
+    // No podemos saber la causa específica (Cardio, Renal...),
+    // así que dejamos 'id_causa_clinica' en null para que el usuario la elija.
+  } 
+  
+  // 2. Fallecido por Traumatismo (Genérico)
+  else if (estadoNombre.includes('traumatismo')) {
+    console.log('Detectado: Traumatismo Genérico. Limpiando campos clínicos.');
+  }
+
+  // 3. Fallecido por Ac. De moto
+  else if (estadoNombre.includes('ac. de moto')) {
+    console.log('Detectado: Accidente de Moto');
+    // Agente Causal General -> Mecánico
+    formulario.value.id_agente_causante_general = findCatalogId('agentes_causantes', 'mecánico');
+    // Causa Traumática (checkbox) -> Motocicleta
+    const idMoto = findCatalogId('causas_traumaticas', 'motocicleta');
+    if (idMoto) formulario.value.id_causas_traumaticas = [idMoto];
+  }
+
+  // 4. Fallecido por Agresión
+  else if (estadoNombre.includes('agresión')) {
+    console.log('Detectado: Agresión');
+    // Causa Traumática (checkbox) -> Ser humano
+    const idHumano = findCatalogId('causas_traumaticas', 'ser humano');
+    if (idHumano) formulario.value.id_causas_traumaticas = [idHumano];
+    // El agente (Mecánico, Químico, etc.) lo dejamos para el usuario.
+  }
+
+  // 5. Suicidio
+  else if (estadoNombre.includes('suicidio')) {
+    console.log('Detectado: Suicidio');
+    // Causa Traumática (checkbox) -> Ser humano
+    const idHumano = findCatalogId('causas_traumaticas', 'ser humano');
+    if (idHumano) formulario.value.id_causas_traumaticas = [idHumano];
+    // El agente lo dejamos para el usuario (puede ser químico, mecánico, etc.)
+  }
+
+  // 6. Ahogamiento
+  else if (estadoNombre.includes('ahogamiento')) {
+    console.log('Detectado: Ahogamiento');
+    // Agente Causal General -> Mecánico (obstrucción)
+    formulario.value.id_agente_causante_general = findCatalogId('agentes_causantes', 'mecánico');
+  }
+
+  // 7. Intoxicación (Ejemplo si lo añades a futuro)  
+  else if (estadoNombre.includes('intoxicación')) {
+    console.log('Detectado: Intoxicación');
+    // Causa Clínica -> Intoxicación
+    formulario.value.id_causa_clinica = findCatalogId('causa_clinica', 'intoxicación');
+    // Agente Causal -> Químico
+    formulario.value.id_agente_causante_general = findCatalogId('agentes_causantes', 'químico');
+  }
+});
 
 // --- Computadas (internas del formulario) ---
 const isAnisocoria = computed(() => {
@@ -463,42 +578,51 @@ const eliminarLesion = (index) => {
 
 // --- Métodos de Submit y Cancel ---
 const handleSubmit = () => {
-  // Validación mejorada
+  // --- Validación de campos obligatorios ---
   if (!formulario.value.paciente_nombre || formulario.value.paciente_nombre.trim() === '') {
     emit('save-error', 'Error: El nombre del paciente es obligatorio.');
     return;
   }
-
   if (!formulario.value.fecha_activacion) {
     emit('save-error', 'Error: La fecha de activación es obligatoria.');
     return;
   }
-
   if (!formulario.value.hora_activacion) {
     emit('save-error', 'Error: La hora de activación es obligatoria.');
     return;
   }
-
   if (!formulario.value.id_tipo_activacion) {
     emit('save-error', 'Error: El tipo de activación es obligatorio.');
     return;
   }
 
-  if (formulario.value.requirio_traslado && (!formulario.value.hospital_destino || formulario.value.hospital_destino.trim() === '')) {
+  // --- Preparamos los datos para enviar (hacemos una copia) ---
+  const datosParaEnviar = JSON.parse(JSON.stringify(formulario.value));
+  datosParaEnviar.id = props.initialData?.id || formulario.value.id;
+
+  // --- LÓGICA DE VALIDACIÓN Y REEMPLAZO DE "OTRO" ---
+  if (datosParaEnviar.requirio_traslado) {
+    if (datosParaEnviar.hospital_destino === 'Otro') {
+      if (!hospitalOtroTexto.value || hospitalOtroTexto.value.trim() === '') {
+        emit('save-error', 'Error: Si selecciona "Otro" hospital, debe especificar el nombre.');
+        return; // Detiene el envío
+      }
+      // Reemplazamos "Otro" por el texto escrito
+      datosParaEnviar.hospital_destino = hospitalOtroTexto.value.trim();
+    
+    } else if (!datosParaEnviar.hospital_destino) {
+      // Si no es "Otro" pero está vacío
       emit('save-error', 'Error: Si se trasladó, debe especificar el Hospital Destino.');
-      return;
-  }
-  if (!formulario.value.requirio_traslado && !formulario.value.id_estado_traslado) {
+      return; // Detiene el envío
+    }
+  } else {
+    // Si NO requirió traslado
+    if (!datosParaEnviar.id_estado_traslado) {
       emit('save-error', 'Error: Si no se trasladó, debe especificar el Estado del Servicio.');
       return;
+    }
   }
-
-  // Preparar datos para enviar
-  const datosParaEnviar = {
-    ...formulario.value,
-    // Asegurar que el ID esté presente en modo edición
-    id: props.initialData?.id || formulario.value.id
-  };
+  // --- FIN LÓGICA "OTRO" ---
 
   console.log("Enviando datos:", datosParaEnviar);
   emit('save', datosParaEnviar);

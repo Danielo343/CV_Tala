@@ -8,6 +8,13 @@
         <span class="button-text">PREHOSPITALARIO</span>
       </router-link>
 
+            <router-link to="/eventos" custom v-slot="{ navigate, isActive }">
+        <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
+          <i class="fas fa-calendar-alt"></i>
+          <span class="button-text">EVENTO</span>
+        </button>
+      </router-link>
+
       <router-link to="/consultas" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
           <i class="fas fa-chart-line"></i>
@@ -15,10 +22,10 @@
         </button>
       </router-link>
       
-      <router-link to="/eventos" custom v-slot="{ navigate, isActive }">
+      <router-link to="/reportes" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
-          <i class="fas fa-calendar-alt"></i>
-          <span class="button-text">EVENTO</span>
+          <i class="fas fa-chart-pie"></i>
+          <span class="button-text">Reportes</span>
         </button>
       </router-link>
       

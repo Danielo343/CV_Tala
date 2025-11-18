@@ -360,12 +360,9 @@
           <div class="search-filter">
             <input 
               type="text" 
-              v-model="filtroBusqueda" 
-              placeholder="Buscar eventos..." 
+              v-model="filtroBusqueda" placeholder="Buscar eventos..." 
               class="form-control search-input"
-            >
-            <select v-model="filtroTipo" class="form-select filter-select">
-              <option :value="null">Todos los tipos</option>
+            > <select v-model="filtroTipo" class="form-select filter-select" @change="fetchEventos"> <option :value="null">Todos los tipos</option>
               <option v-for="tipo in catalogos.tipos_evento" :key="tipo.id" :value="tipo.id">
                 {{ tipo.nombre }}
               </option>
@@ -441,7 +438,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue'; // <-- 1. Importamos watch y onUnmounted
 import api from '@/services/api';
 
 export default {
@@ -461,8 +458,11 @@ export default {
     const formulario = ref(resetFormularioState());
     const mensaje = ref('');
     const error = ref(false);
+    
+    // --- 2. Añadimos el timer para debounce ---
     const filtroBusqueda = ref('');
     const filtroTipo = ref(null);
+    const debounceTimer = ref(null);
 
     const unidadesAtencion = computed(() => {
         return (catalogos.value.unidades_transporte || []).map(u => ({
@@ -485,23 +485,9 @@ export default {
       );
     });
 
+    // --- 3. Simplificamos el filtro del frontend (la API hace el trabajo) ---
     const eventosFiltrados = computed(() => {
-      let filtered = eventos.value;
-      
-      if (filtroBusqueda.value) {
-        const search = filtroBusqueda.value.toLowerCase();
-        filtered = filtered.filter(evento => 
-          evento.nombre_evento.toLowerCase().includes(search) ||
-          (evento.descripcion && evento.descripcion.toLowerCase().includes(search)) ||
-          (evento.lugar && evento.lugar.toLowerCase().includes(search))
-        );
-      }
-      
-      if (filtroTipo.value) {
-        filtered = filtered.filter(evento => evento.id_tipo_evento == filtroTipo.value);
-      }
-      
-      return filtered;
+      return eventos.value;
     });
 
     function resetFormularioState() {
@@ -536,7 +522,6 @@ export default {
     const getPayload = () => {
         const payload = { ...formulario.value };
         
-        // Convertir strings vacíos a null
         const camposAConvertirNull = [
           'direccion', 'organizador', 'institucion_responsable', 
           'objetivos', 'descripcion', 'observaciones', 
@@ -550,7 +535,6 @@ export default {
             }
         }
 
-        // Asegurar que los campos numéricos sean null si están vacíos
         const camposNumericos = [
           'participantes_esperados', 'ambulancias_asignadas', 
           'personal_medico', 'personal_apoyo'
@@ -568,7 +552,7 @@ export default {
     const toggleView = () => {
       showList.value = !showList.value;
       if (showList.value) {
-        fetchEventos();
+        fetchEventos(); // Recargamos al volver a la lista
         isEditing.value = false;
       } else {
         mensaje.value = '';
@@ -589,7 +573,6 @@ export default {
         const res = await api.get('/catalogos');
         const d = res.data || {};
         
-        // Agregar fallbacks para cada propiedad
         catalogos.value.tipos_evento = d.tipos_evento || [];
         catalogos.value.categorias = d.categorias || [];
         catalogos.value.personal = d.personal || [];
@@ -600,20 +583,28 @@ export default {
         mensaje.value = 'No se pudieron cargar las listas de catálogos.';
         error.value = true;
         
-        // Inicializar arrays vacíos para evitar errores
         catalogos.value.tipos_evento = [];
         catalogos.value.categorias = [];
         catalogos.value.personal = [];
         catalogos.value.unidades_transporte = [];
       } finally {
-          loadingList.value = false; 
+          // No ponemos loadingList.value = false aquí, dejamos que fetchEventos lo haga
       }
     };
 
+    // --- 4. Modificamos fetchEventos para que use los filtros ---
     const fetchEventos = async () => {
       loadingList.value = true;
       try {
-        const res = await api.get('/eventos'); 
+        const params = {};
+        if (filtroBusqueda.value) {
+          params.busqueda_texto = filtroBusqueda.value;
+        }
+        if (filtroTipo.value) {
+          params.id_tipo_evento = filtroTipo.value;
+        }
+        
+        const res = await api.get('/eventos', { params }); 
         eventos.value = res.data || [];
       } catch (err) {
         console.error('Error cargando eventos', err);
@@ -711,14 +702,10 @@ export default {
         if (!confirm(`¿Está seguro de que desea eliminar el evento "${evento.nombre_evento}"? Esta acción es irreversible.`)) {
             return;
         }
-
         try {
             await api.delete(`/eventos/${evento.id}`);
-            
             alert(`Evento "${evento.nombre_evento}" eliminado exitosamente.`);
-
             await fetchEventos(); 
-
         } catch (err) {
             console.error('Error al eliminar el evento:', err);
             alert('Error al eliminar el evento. Intente de nuevo.');
@@ -744,13 +731,28 @@ export default {
     };
 
     const getTipoEvento = (idTipo) => {
-      const tipo = catalogos.value.tipos_evento.find(t => t.id == idTipo);
+      const tipo = (catalogos.value.tipos_evento || []).find(t => t.id == idTipo);
       return tipo ? tipo.nombre : 'Sin tipo';
     };
 
+    // --- 5. Añadimos el watch para el debounce ---
+    watch(filtroBusqueda, (newValue, oldValue) => {
+      if (debounceTimer.value) clearTimeout(debounceTimer.value);
+      debounceTimer.value = setTimeout(() => {
+        if (!loadingList.value) {
+          fetchEventos();
+        }
+      }, 400); // 400ms debounce
+    });
+
     onMounted(() => {
-      fetchCatalogos();
-      fetchEventos();
+      fetchCatalogos(); // Carga catálogos primero
+      fetchEventos();  // Luego carga eventos (ya con filtros vacíos)
+    });
+    
+    // --- 6. Añadimos onUnmounted para limpiar el timer ---
+    onUnmounted(() => {
+      if (debounceTimer.value) clearTimeout(debounceTimer.value);
     });
 
     return {
@@ -776,9 +778,10 @@ export default {
       onTipoEventoChange,
       formatFecha,
       formatEstado,
-      getTipoEvento
+      getTipoEvento,
+      fetchEventos // <-- 7. Exponemos fetchEventos para el @change
     };
-  }
+    }
 }
 </script>
 
