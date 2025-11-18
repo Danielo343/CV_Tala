@@ -3,28 +3,29 @@
     <div class="sidebar-section">
       <div class="sidebar-title">Módulos Principales</div>
       
-      <router-link to="/" :class="['sidebar-button', { active: $route.name === 'Prehospitalario' }]">
+
+      <router-link to="/registros" :class="['sidebar-button', { active: $route.path.startsWith('/registros') }]">
         <i class="fas fa-ambulance"></i>
-        <span class="button-text">PREHOSPITALARIO</span>
+        <span class="button-text">Prehospitalario</span>
       </router-link>
 
             <router-link to="/eventos" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
-          <i class="fas fa-calendar-alt"></i>
-          <span class="button-text">EVENTO</span>
+          <i class="fas fa-calendar-alt "></i>
+          <span class="button-text">Eventos</span>
         </button>
       </router-link>
 
-      <router-link to="/consultas" custom v-slot="{ navigate, isActive }">
+            <router-link to="/consultas" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
-          <i class="fas fa-chart-line"></i>
+          <i class="fas fa-magnifying-glass"></i>
           <span class="button-text">Consultas</span>
         </button>
       </router-link>
       
-      <router-link to="/reportes" custom v-slot="{ navigate, isActive }">
+      <router-link to="/reportes" custom v-slot="{ navigate, isActive}">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
-          <i class="fas fa-chart-pie"></i>
+          <i class="fas fa-chart-line"></i>
           <span class="button-text">Reportes</span>
         </button>
       </router-link>

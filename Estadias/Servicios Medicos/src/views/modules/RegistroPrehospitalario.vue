@@ -283,7 +283,7 @@
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
               <i class="fas fa-times me-2"></i>Cerrar
             </button>
-            <button type="button" class="btn btn-primary">
+            <button type="button" class="btn btn-primary" @click="generarFichaPDF(activacionSeleccionada)">
               <i class="fas fa-print me-2"></i>Imprimir Ficha
             </button>
           </div>
@@ -300,6 +300,7 @@ import { ref, onMounted, computed } from 'vue'; // <--- Eliminamos 'watch'
 import { useStore } from 'vuex';
 import api from '@/services/api';
 import { Modal } from 'bootstrap'; 
+import { generarFichaPDF } from '@/utils/pdfGenerator';
 // --- CAMBIO ---
 // Importamos el nuevo componente que hicimos en el Paso 1
 import FormActivacion from '@/components/FormActivacion.vue'; 
@@ -530,6 +531,7 @@ export default {
       errorDetalle,
       activacionSeleccionada,
       verDetalle,
+      generarFichaPDF,
       formatDateForDisplay,
       
       // Computadas de la Vista

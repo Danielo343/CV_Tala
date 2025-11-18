@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import store from '@/store' // <-- IMPORTA EL STORE
+import store from '@/store'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 
@@ -10,6 +10,8 @@ import EventosView from '@/views/modules/EventosView.vue'
 import GestionUsuarios from '@/views/modules/GestionUsuarios.vue'
 import ReportesView from '@/views/modules/ReportesView.vue'
 import HistorialView from '@/views/modules/HistorialView.vue'
+import ConfiguracionView from '@/views/modules/ConfiguracionView.vue'
+import InicioView from '@/views/modules/InicioView.vue'
 
 
 const routes = [
@@ -24,8 +26,14 @@ const routes = [
     component: DashboardView,
     meta: { requiresAuth: true }, // Todas las rutas hijas requieren estar logueado
     children: [
+{
+        path: '', 
+        name: 'Inicio',
+        component: InicioView
+      },
+      // 2. Ruta movida -> Captura
       {
-        path: '', // La raíz "/" mostrará los reportes
+        path: 'registros', 
         name: 'Prehospitalario',
         component: RegistroPrehospitalario
       },
@@ -64,10 +72,17 @@ const routes = [
         name: 'Reportes',
         component: ReportesView,
         meta: { 
-          requiresAuth: true,
-          adminOnly: true // Solo los admins pueden ver esto
+          requiresAuth: true
         }
       },
+
+      {
+        path: 'configuracion',
+        name: 'Configuracion',
+        component: ConfiguracionView,
+        meta: { requiresAuth: true, adminOnly: true }
+      },
+      
       // --- FIN DE RUTA NUEVA ---
     ]
   },
@@ -113,5 +128,7 @@ router.beforeEach((to, from, next) => {
     next();
   }
 });
+
+
 
 export default router

@@ -42,26 +42,35 @@ async function getCatalogos() {
 
   console.log('Cargando catálogos en caché...');
   try {
-    const [
+const [
       tipos_activacion, causa_clinica, agentes_causantes,
       causas_traumaticas, unidades, estados_traslado,
       estados_pupilas, estados_piel, tipos_lesion, ubicaciones_lesion,
       tipos_evento, categorias_evento, personal, hospitales
     ] = await Promise.all([
-      pool.query('SELECT * FROM tipo_activacion ORDER BY id'),
-      pool.query('SELECT * FROM causa_clinica ORDER BY id'),
-      pool.query('SELECT * FROM agente_causante_general ORDER BY id'),
-      pool.query('SELECT * FROM causa_traumatica_especifica ORDER BY id'),
-      pool.query('SELECT * FROM unidad_asignada ORDER BY id'),
-      pool.query('SELECT * FROM estado_traslado ORDER BY id'),
+      // Tablas con columna 'activo' (Agregamos el filtro)
+      pool.query('SELECT * FROM tipo_activacion WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM causa_clinica WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM agente_causante_general WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM causa_traumatica_especifica WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM unidad_asignada WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM estado_traslado WHERE activo = true ORDER BY id'),
+      
+      // Tablas sin columna 'activo' (Se quedan igual)
       pool.query('SELECT * FROM estado_pupilas ORDER BY id'),
       pool.query('SELECT * FROM estado_piel ORDER BY id'),
-      pool.query('SELECT * FROM tipo_lesion ORDER BY id'),
-      pool.query('SELECT * FROM ubicacion_lesion ORDER BY id'),
-      pool.query('SELECT * FROM tipo_evento ORDER BY id'),
+      
+      // Tablas con columna 'activo'
+      pool.query('SELECT * FROM tipo_lesion WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM ubicacion_lesion WHERE activo = true ORDER BY id'),
+      pool.query('SELECT * FROM tipo_evento WHERE activo = true ORDER BY id'),
+      
+      // Categorias no tiene 'activo' aún, se queda igual
       pool.query('SELECT * FROM categoria_evento ORDER BY id'),
       pool.query('SELECT id, nombre_completo AS nombre FROM usuarios ORDER BY nombre_completo'),
-      pool.query('SELECT * FROM catalogo_hospitales ORDER BY nombre'),
+      
+      // Hospitales con filtro
+      pool.query('SELECT * FROM catalogo_hospitales WHERE activo = true ORDER BY nombre'),
     ]);
 
     // Función helper para crear un Map (ej: '1' -> 'Accidente')
@@ -567,18 +576,21 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         a.paciente_nombre,
         a.paciente_edad,
         a.paciente_sexo,
-        a.hospital_destino,                   -- <-- Corregido: Ya se envía
+        a.hospital_destino,
+        a.requirio_traslado,  -- Nos aseguramos de traer este campo booleano
         
         ta.nombre AS tipo_activacion,
         cc.nombre AS causa_clinica,
-        ua.nombre AS unidad_asignada_nombre,  -- <-- Corregido: Ya se envía
+        ua.nombre AS unidad_asignada_nombre,
+        et.nombre AS estado_traslado, -- <--- ¡NUEVO! Traemos la razón de no traslado
         
-        a.id_tipo_activacion,                 -- <-- Corregido: Ya se envía
-        a.id_causa_clinica,                   -- <-- Corregido: Ya se envía
-        a.id_unidad_asignada                  -- <-- Corregido: Ya se envía
+        a.id_tipo_activacion,
+        a.id_causa_clinica,
+        a.id_unidad_asignada
       FROM 
         activaciones AS a
       ${joins}
+      LEFT JOIN estado_traslado AS et ON a.id_estado_traslado = et.id -- <--- ¡NUEVO! Unimos la tabla
     `;
 
     if (whereClauses.length > 0) {
@@ -1354,18 +1366,250 @@ app.delete('/api/usuarios/:id', [verificarToken, adminOnly], async (req, res) =>
 
 
 // --- RUTA PARA VER EL HISTORIAL (Sin cambios) ---
+// --- RUTA MEJORADA PARA EL HISTORIAL ---
 app.get('/api/historial', [verificarToken, adminOnly], async (req, res) => {
-  // ... (tu código de GET /api/historial no cambia)
+  const { 
+    fecha_inicio, 
+    fecha_fin, 
+    id_usuario, 
+    accion,
+    tipo_entidad,
+    id_entidad,
+    page = 1, 
+    limit = 20 
+  } = req.query;
+
+  const offset = (page - 1) * limit;
+
   try {
-    const result = await pool.query(
-      `SELECT * FROM historial_actividad 
-       ORDER BY timestamp DESC 
-       LIMIT 100`
-    );
-    res.json(result.rows);
+    let whereClauses = [];
+    let values = [];
+
+    // 1. Filtro por Rango de Fechas
+    if (fecha_inicio && fecha_fin) {
+      values.push(fecha_inicio, fecha_fin);
+      whereClauses.push(`DATE("timestamp") BETWEEN $${values.length - 1} AND $${values.length}`);
+    } else if (fecha_inicio) {
+      values.push(fecha_inicio);
+      whereClauses.push(`DATE("timestamp") >= $${values.length}`);
+    } else if (fecha_fin) {
+      values.push(fecha_fin);
+      whereClauses.push(`DATE("timestamp") <= $${values.length}`);
+    }
+
+    // 2. Filtro por Usuario
+    if (id_usuario) {
+      values.push(id_usuario);
+      whereClauses.push(`id_usuario = $${values.length}`);
+    }
+
+    // 3. Filtro por Acción
+    if (accion) {
+      values.push(accion);
+      whereClauses.push(`accion = $${values.length}`);
+    }
+
+    // 4. Filtro por Tipo de Entidad
+    if (tipo_entidad) {
+      values.push(tipo_entidad);
+      whereClauses.push(`tipo_entidad = $${values.length}`);
+    }
+
+    // 5. Filtro por ID de Entidad
+    if (id_entidad) {
+      values.push(id_entidad);
+      whereClauses.push(`id_entidad = $${values.length}`);
+    }
+
+    const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    // Consulta principal con JOIN para obtener nombre de usuario
+    const queryData = `
+      SELECT 
+        h.*,
+        u.nombre_completo as nombre_usuario,
+        u.email as usuario_email
+      FROM historial_actividad h
+      LEFT JOIN usuarios u ON h.id_usuario = u.id
+      ${whereStr}
+      ORDER BY h."timestamp" DESC
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+
+    // Consulta para el total
+    const queryCount = `
+      SELECT COUNT(*) 
+      FROM historial_actividad h
+      ${whereStr}
+    `;
+
+    // Consulta para estadísticas
+    const queryStats = `
+      SELECT 
+        accion,
+        COUNT(*) as count
+      FROM historial_actividad h
+      ${whereStr}
+      GROUP BY accion
+    `;
+
+    // Ejecutar consultas en paralelo
+    const [dataRes, countRes, statsRes] = await Promise.all([
+      pool.query(queryData, [...values, parseInt(limit), offset]),
+      pool.query(queryCount, values),
+      pool.query(queryStats, values)
+    ]);
+
+    // Procesar estadísticas
+    const stats = {
+      creaciones: 0,
+      ediciones: 0,
+      eliminaciones: 0
+    };
+
+    statsRes.rows.forEach(row => {
+      switch(row.accion) {
+        case 'CREAR':
+          stats.creaciones = parseInt(row.count);
+          break;
+        case 'EDITAR':
+          stats.ediciones = parseInt(row.count);
+          break;
+        case 'ELIMINAR':
+          stats.eliminaciones = parseInt(row.count);
+          break;
+      }
+    });
+
+    res.json({
+      data: dataRes.rows,
+      total: parseInt(countRes.rows[0].count),
+      page: parseInt(page),
+      limit: parseInt(limit),
+      stats: stats,
+      filtros: {
+        fecha_inicio,
+        fecha_fin,
+        id_usuario,
+        accion,
+        tipo_entidad,
+        id_entidad
+      }
+    });
+
   } catch (err) {
     console.error('Error al obtener historial:', err);
-    res.status(500).json({ error: 'Error interno al consultar el historial' });
+    res.status(500).json({ 
+      error: 'Error interno al consultar el historial',
+      detalles: err.message 
+    });
+  }
+});
+
+app.get('/api/historial/exportar', [verificarToken, adminOnly], async (req, res) => {
+  const { formato = 'csv' } = req.query;
+
+  try {
+    const query = `
+      SELECT 
+        h."timestamp" as fecha,
+        u.nombre_completo as usuario,
+        h.accion,
+        h.tipo_entidad,
+        h.id_entidad,
+        h.detalles,
+        h.ip_address
+      FROM historial_actividad h
+      LEFT JOIN usuarios u ON h.id_usuario = u.id
+      ORDER BY h."timestamp" DESC
+    `;
+
+    const result = await pool.query(query);
+
+    if (formato === 'csv') {
+      // Generar CSV
+      const headers = ['Fecha', 'Usuario', 'Acción', 'Entidad', 'ID Entidad', 'Detalles', 'IP'];
+      const csvData = result.rows.map(row => [
+        new Date(row.fecha).toLocaleString('es-MX'),
+        row.usuario || 'Sistema',
+        row.accion,
+        row.tipo_entidad,
+        row.id_entidad,
+        `"${(row.detalles || '').replace(/"/g, '""')}"`,
+        row.ip_address || 'N/A'
+      ]);
+
+      const csvContent = [headers, ...csvData]
+        .map(row => row.join(','))
+        .join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=historial.csv');
+      res.send(csvContent);
+    } else {
+      res.json(result.rows);
+    }
+
+  } catch (err) {
+    console.error('Error al exportar historial:', err);
+    res.status(500).json({ error: 'Error interno al exportar historial' });
+  }
+});
+
+// --- RUTA PARA OBTENER ESTADÍSTICAS GLOBALES ---
+app.get('/api/historial/estadisticas', [verificarToken, adminOnly], async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN accion = 'CREAR' THEN 1 END) as creaciones,
+        COUNT(CASE WHEN accion = 'EDITAR' THEN 1 END) as ediciones,
+        COUNT(CASE WHEN accion = 'ELIMINAR' THEN 1 END) as eliminaciones,
+        COUNT(DISTINCT id_usuario) as usuarios_activos,
+        COUNT(DISTINCT tipo_entidad) as tipos_entidad,
+        MAX("timestamp") as ultima_actividad
+      FROM historial_actividad
+      WHERE "timestamp" >= CURRENT_DATE - INTERVAL '30 days'
+    `;
+
+    const result = await pool.query(query);
+    
+    res.json({
+      estadisticas: result.rows[0],
+      periodo: '30_dias'
+    });
+
+  } catch (err) {
+    console.error('Error al obtener estadísticas:', err);
+    res.status(500).json({ error: 'Error interno al obtener estadísticas' });
+  }
+});
+
+// --- RUTA PARA ACTIVIDAD RECIENTE ---
+app.get('/api/historial/reciente', [verificarToken, adminOnly], async (req, res) => {
+  const { limite = 10 } = req.query;
+
+  try {
+    const query = `
+      SELECT 
+        h.*,
+        u.nombre_completo as nombre_usuario
+      FROM historial_actividad h
+      LEFT JOIN usuarios u ON h.id_usuario = u.id
+      ORDER BY h."timestamp" DESC
+      LIMIT $1
+    `;
+
+    const result = await pool.query(query, [parseInt(limite)]);
+    
+    res.json({
+      actividad_reciente: result.rows,
+      total: result.rows.length
+    });
+
+  } catch (err) {
+    console.error('Error al obtener actividad reciente:', err);
+    res.status(500).json({ error: 'Error interno al obtener actividad reciente' });
   }
 });
 
@@ -1380,7 +1624,7 @@ let { fecha_inicio, fecha_fin } = req.query;
 };
 // --- RUTAS PARA REPORTES DE ACTIVACIONES ---
 // 1. Gráfica: Origen de Activación (image_d0ffc8.png)
-app.get('/api/reportes/origen', [verificarToken, adminOnly], async (req, res) => {
+app.get('/api/reportes/origen', [verificarToken], async (req, res) => {
   const [fecha_inicio, fecha_fin] = getFechasReporte(req);
   try {
     const query = `
@@ -1402,7 +1646,7 @@ app.get('/api/reportes/origen', [verificarToken, adminOnly], async (req, res) =>
 });
 
 // 2. Gráfica: Urgencias Médicas (Imagen...9eac2d29.jpg)
-app.get('/api/reportes/causas-clinicas', [verificarToken, adminOnly], async (req, res) => {
+app.get('/api/reportes/causas-clinicas', [verificarToken], async (req, res) => {
   const [fecha_inicio, fecha_fin] = getFechasReporte(req);
   try {
     const query = `
@@ -1425,7 +1669,7 @@ app.get('/api/reportes/causas-clinicas', [verificarToken, adminOnly], async (req
 });
 
 // 3. Gráfica: Emergencias Traumatológicas (Imagen...c5a9596a.jpg)
-app.get('/api/reportes/causas-traumaticas', [verificarToken, adminOnly], async (req, res) => {
+app.get('/api/reportes/causas-traumaticas', [verificarToken], async (req, res) => {
   const [fecha_inicio, fecha_fin] = getFechasReporte(req);
   try {
     const query = `
@@ -1449,7 +1693,7 @@ app.get('/api/reportes/causas-traumaticas', [verificarToken, adminOnly], async (
 });
 
 // 4. Gráfica: Destino Posterior (image_d103a7.png)
-app.get('/api/reportes/destinos', [verificarToken, adminOnly], async (req, res) => {
+app.get('/api/reportes/destinos', [verificarToken], async (req, res) => {
   const [fecha_inicio, fecha_fin] = getFechasReporte(req);
   try {
     const query = `
@@ -1498,6 +1742,158 @@ app.get('/api/reportes/destinos', [verificarToken, adminOnly], async (req, res) 
   }
 });
 
+// Mapa seguro: Nombre en URL -> Nombre Real en Base de Datos
+const TABLE_MAP = {
+  'hospitales': 'catalogo_hospitales',
+  'unidades': 'unidad_asignada',
+  'tipos-evento': 'tipo_evento',
+  'causas-clinicas': 'causa_clinica',
+  'tipos-lesion': 'tipo_lesion',
+  'tipos-activacion': 'tipo_activacion',
+  'causas-traumaticas': 'causa_traumatica_especifica',
+  'ubicaciones-lesion': 'ubicacion_lesion',
+  'estados-traslado': 'estado_traslado',
+  'agentes-causales': 'agente_causante_general'
+};
+
+// 1. GET: Obtener lista (Ordenada por ID)
+app.get('/api/config/:catalogo', verificarToken, async (req, res) => {
+  const { catalogo } = req.params;
+  const tableName = TABLE_MAP[catalogo];
+
+  if (!tableName) return res.status(400).json({ error: 'Catálogo no válido' });
+
+  try {
+    const result = await pool.query(`SELECT * FROM ${tableName} ORDER BY nombre ASC`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(`Error al obtener catálogo ${catalogo}:`, err);
+    res.status(500).json({ error: 'Error al cargar el catálogo' });
+  }
+});
+
+// 2. POST: Crear nuevo
+app.post('/api/config/:catalogo', [verificarToken, adminOnly], async (req, res) => {
+  const { catalogo } = req.params;
+  const { nombre } = req.body;
+  const tableName = TABLE_MAP[catalogo];
+
+  if (!tableName || !nombre) return res.status(400).json({ error: 'Datos inválidos' });
+
+  try {
+    const query = `INSERT INTO ${tableName} (nombre, activo) VALUES ($1, true) RETURNING *`;
+    const result = await pool.query(query, [nombre]);
+    
+    catalogCache = null;
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(`Error al crear en ${catalogo}:`, err);
+    res.status(500).json({ error: 'Error al crear (posible duplicado)' });
+  }
+});
+
+// 3. PUT: Editar nombre
+app.put('/api/config/:catalogo/:id', [verificarToken, adminOnly], async (req, res) => {
+  const { catalogo, id } = req.params;
+  const { nombre } = req.body;
+  const tableName = TABLE_MAP[catalogo];
+
+  if (!tableName || !nombre) return res.status(400).json({ error: 'Datos inválidos' });
+
+  try {
+    const query = `UPDATE ${tableName} SET nombre = $1 WHERE id = $2 RETURNING *`;
+    const result = await pool.query(query, [nombre, id]);
+    
+    catalogCache = null;
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`Error al editar en ${catalogo}:`, err);
+    res.status(500).json({ error: 'Error al actualizar' });
+  }
+});
+
+// 4. DELETE INTELIGENTE (Con protección especial para Hospitales)
+app.delete('/api/config/:catalogo/:id', [verificarToken, adminOnly], async (req, res) => {
+  const { catalogo, id } = req.params;
+  const tableName = TABLE_MAP[catalogo];
+
+  if (!tableName) return res.status(400).json({ error: 'Catálogo no válido' });
+
+  try {
+    // --- PASO EXTRA SOLO PARA HOSPITALES ---
+    if (catalogo === 'hospitales') {
+      // 1. Obtenemos el nombre del hospital
+      const hospitalResult = await pool.query('SELECT nombre FROM catalogo_hospitales WHERE id = $1', [id]);
+      
+      if (hospitalResult.rows.length > 0) {
+        const nombreHospital = hospitalResult.rows[0].nombre;
+        
+        // 2. Buscamos si se usó en activaciones (buscando por texto)
+        const usoResult = await pool.query('SELECT 1 FROM activaciones WHERE hospital_destino = $1 LIMIT 1', [nombreHospital]);
+        
+        // 3. Si se usa, forzamos la desactivación
+        if (usoResult.rows.length > 0) {
+          const softDeleteQuery = `UPDATE ${tableName} SET activo = false WHERE id = $1 RETURNING *`;
+          await pool.query(softDeleteQuery, [id]);
+          
+          catalogCache = null;
+          return res.json({ 
+            type: 'soft_deleted', 
+            message: `El hospital "${nombreHospital}" se usa en reportes históricos. Se ha DESACTIVADO para no afectar las estadísticas.` 
+          });
+        }
+      }
+    }
+    // --- FIN PASO EXTRA ---
+
+    // INTENTO NORMAL (Borrado Físico)
+    const query = `DELETE FROM ${tableName} WHERE id = $1`;
+    await pool.query(query, [id]);
+    
+    catalogCache = null; 
+    res.json({ type: 'deleted', message: 'Registro eliminado permanentemente (no tenía uso).' });
+
+  } catch (err) {
+    // INTENTO 2: Fallback por llave foránea (Para Unidades, Tipos, etc.)
+    if (err.code === '23503') {
+      try {
+        const softDeleteQuery = `UPDATE ${tableName} SET activo = false WHERE id = $1 RETURNING *`;
+        await pool.query(softDeleteQuery, [id]);
+        
+        catalogCache = null;
+        return res.json({ 
+          type: 'soft_deleted', 
+          message: 'El registro está en uso. Se ha DESACTIVADO en lugar de borrarse.' 
+        });
+      } catch (updateErr) {
+        console.error(`Error al desactivar fallback en ${catalogo}:`, updateErr);
+        return res.status(500).json({ error: 'Error crítico al intentar desactivar.' });
+      }
+    }
+    console.error(`Error al eliminar en ${catalogo}:`, err);
+    res.status(500).json({ error: 'Error desconocido al eliminar.' });
+  }
+});
+
+// 5. TOGGLE: Reactivar o Desactivar manualmente
+app.patch('/api/config/:catalogo/:id/toggle', [verificarToken, adminOnly], async (req, res) => {
+  const { catalogo, id } = req.params;
+  const { activo } = req.body;
+  const tableName = TABLE_MAP[catalogo];
+
+  if (!tableName) return res.status(400).json({ error: 'Catálogo no válido' });
+
+  try {
+    const query = `UPDATE ${tableName} SET activo = $1 WHERE id = $2 RETURNING *`;
+    const result = await pool.query(query, [activo, id]);
+    
+    catalogCache = null;
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`Error al cambiar estado en ${catalogo}:`, err);
+    res.status(500).json({ error: 'Error al actualizar el estado' });
+  }
+});
 
 // 7. Iniciar Servidor
 // --- 👇 ¡MODIFICADO! Cargamos la caché antes de iniciar ---

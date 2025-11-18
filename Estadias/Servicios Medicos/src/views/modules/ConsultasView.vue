@@ -275,11 +275,11 @@
                     <td class="folio-cell-improved">
                       <div class="folio-badge-improved">{{ activacion.num_reporte_local }}</div>
                     </td>
-                    <td class="folio-externo-cell">
+                    <td class="folio-externo-cell" style="text-align: center;">
                       <span v-if="activacion.num_reporte_externo" class="folio-externo-badge">
                         {{ activacion.num_reporte_externo }}
                       </span>
-                      <span v-else class="text-muted">N/A</span>
+                      <span v-else class="text-muted"> N/A</span>
                     </td>
                     <td class="fecha-cell-improved">
                       <div class="fecha-text">{{ formatDateForDisplay(activacion.fecha_activacion) }}</div>
@@ -303,10 +303,12 @@
                       <span class="unidad-text">{{ activacion.unidad_asignada_nombre || 'N/A' }}</span>
                     </td>
                     <td class="causa-cell-improved">
-                      <span class="causa-text">{{ activacion.causa_clinica || 'N/A' }}</span>
+                      <span class="causa-text" >{{ activacion.causa_clinica || 'N/A' }}</span>
                     </td>
                     <td class="hospital-cell-improved">
-                      <span class="hospital-text">{{ activacion.hospital_destino || 'N/A' }}</span>
+                      <span class="hospital-text">
+                        {{ activacion.hospital_destino || activacion.estado_traslado || 'N/A' }}
+                      </span>
                     </td>
                     <td class="acciones-cell-improved">
                       <div class="action-buttons-improved">
@@ -602,7 +604,7 @@
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
               <i class="fas fa-times me-2"></i>Cerrar
             </button>
-            <button type="button" class="btn btn-primary">
+            <button type="button" class="btn btn-primary" @click="generarFichaPDF(activacionSeleccionada)">
               <i class="fas fa-print me-2"></i>Imprimir Ficha
             </button>
           </div>
@@ -613,12 +615,14 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted, Text } from 'vue';
 import { useStore } from 'vuex'; 
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import { Modal } from 'bootstrap'; 
 import FormActivacion from '@/components/FormActivacion.vue'; 
+import * as XLSX from 'xlsx';
+import { generarFichaPDF } from '@/utils/pdfGenerator';
 
 // --- Funciones Helper ---
 const toISODate = (date) => {
@@ -845,9 +849,72 @@ const setFiltroRapido = (periodo) => {
       buscarActivaciones();
     };
 
-    const exportarResultados = () => {
-      console.log('Exportando resultados:', resultados.value);
-      alert('Función de exportación en desarrollo');
+const exportarResultados = () => {
+      if (resultadosFiltrados.value.length === 0) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+
+      try {
+        const datosParaExcel = resultadosFiltrados.value.map(fila => {
+          // Lógica inteligente para determinar si hubo traslado
+          // Si 'requirio_traslado' es true O si el campo de hospital tiene texto real
+          const huboTraslado = fila.requirio_traslado || (fila.hospital_destino && fila.hospital_destino !== 'N/A' && fila.hospital_destino.trim() !== '');
+          
+          // Determinar qué mostrar en la columna final
+          let destinoFinal = 'N/D';
+          if (huboTraslado) {
+            destinoFinal = fila.hospital_destino || 'Hospital No Especificado';
+          } else {
+            // Si no hubo traslado, mostramos la razón (estado_traslado) que ahora viene del backend
+            destinoFinal = fila.estado_traslado || 'No especificado';
+          }
+
+          return {
+            'Folio Interno': fila.num_reporte_local,
+            'Folio Externo': fila.num_reporte_externo || 'N/A',
+            'Fecha': formatDateForDisplay(fila.fecha_activacion),
+            'Hora': fila.hora_activacion ? fila.hora_activacion.substring(0, 5) : 'N/A',
+            'Paciente': fila.paciente_nombre,
+            'Edad': fila.paciente_edad ? `${fila.paciente_edad} años` : 'N/D',
+            'Sexo': fila.paciente_sexo || 'N/D',
+            'Tipo Activación': fila.tipo_activacion || 'N/D',
+            'Unidad': fila.unidad_asignada_nombre || 'N/D',
+            'Causa Clínica': fila.causa_clinica || 'N/D',
+            'Traslado': huboTraslado ? 'Sí' : 'No', // <-- Ahora esto será consistente
+            'Hospital / Motivo No Traslado': destinoFinal // <-- Columna combinada inteligente
+          };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+
+        const wscols = [
+          { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 8 }, 
+          { wch: 25 }, { wch: 10 }, { wch: 5 }, { wch: 20 }, 
+          { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 35 }
+        ];
+        worksheet['!cols'] = wscols;
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Activaciones");
+
+        // --- LÓGICA DE NOMBRE DE ARCHIVO CON FECHAS ---
+        let nombreArchivo = '';
+        if (filtros.value.fecha_inicio && filtros.value.fecha_fin) {
+          // Si hay fechas seleccionadas: "Reporte_2025-01-01_al_2025-01-31.xlsx"
+          nombreArchivo = `Reporte_ ${filtros.value.fecha_inicio} AL ${filtros.value.fecha_fin}.xlsx`;
+        } else {
+          // Si es histórico completo
+          const hoy = new Date().toISOString().split('T')[0];
+          nombreArchivo = `Reporte_Historico_Generado_${hoy}.xlsx`;
+        }
+
+        XLSX.writeFile(workbook, nombreArchivo);
+
+      } catch (error) {
+        console.error("Error al exportar a Excel:", error);
+        alert("Hubo un error al generar el archivo de Excel.");
+      }
     };
 
     // --- Nuevos Métodos para Mejoras ---
@@ -1101,6 +1168,7 @@ const setFiltroRapido = (periodo) => {
       scrollToTop,
 
       // Métodos del modal de detalle
+      generarFichaPDF,
       verDetalle,
 
       // Métodos del panel de edición
@@ -1550,6 +1618,7 @@ const setFiltroRapido = (periodo) => {
 }
 
 .causa-cell-improved {
+  text-align: center;
   width: 150px;
 }
 

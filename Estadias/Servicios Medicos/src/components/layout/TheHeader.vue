@@ -2,21 +2,21 @@
   <header class="dashboard-header">
     <div class="header-content">
       <div class="logo">
-        <i class="fas fa-heartbeat"></i>
+        <img src="/ServiciosMedicos.png" alt="Servicios Medicos" class="logo-img" />
         <span>CV Tala</span>
       </div>
       <!-- --- MENÚ DE USUARIO ACTUALIZADO --- -->
-      <div class="user-menu">
+<div class="user-menu">
         
-        <!-- Icono de Campana ELIMINADO -->
+        <router-link to="/" class="home-button" title="Ir a Inicio">
+          <i class="fas fa-home"></i>
+        </router-link>
 
-        <!-- Contenedor relativo para el dropdown -->
         <div class="user-avatar-container">
           <div class="user-avatar" @click="toggleDropdown" title="Opciones de usuario">
             {{ userInitials }}
           </div>
 
-          <!-- El menú desplegable -->
           <transition name="dropdown-fade">
             <div v-if="isDropdownOpen" class="user-dropdown">
               <div class="dropdown-header">
@@ -26,18 +26,18 @@
                 </span>
               </div>
               <ul class="dropdown-menu-list">
-                
-                <!-- ¡NUEVO ENLACE! -->
                 <li v-if="isAdmin" @click="goTo('HistorialActividad')">
                   <i class="fas fa-history"></i>
                   <span>Historial de Actividad</span>
                 </li>
-
                 <li v-if="isAdmin" @click="goTo('GestionUsuarios')">
                   <i class="fas fa-users-cog"></i>
                   <span>Gestionar Usuarios</span>
                 </li>
-
+                <li v-if="isAdmin" @click="goTo('Configuracion')">
+                  <i class="fas fa-cogs"></i>
+                  <span>Configuración</span>
+                </li>
                 <li @click="handleLogout">
                   <i class="fas fa-sign-out-alt"></i>
                   <span>Cerrar Sesión</span>
@@ -102,6 +102,40 @@ export default {
 </script>
 
 <style scoped>
+
+/* Estilo MEJORADO para el botón de casita */
+.home-button {
+  color: #007bff;            /* Color azul primario para que destaque */
+  background-color: #f0f4ff; /* Fondo azul muy clarito */
+  font-size: 1.6rem;         /* Ícono más grande */
+  
+  /* Hacemos el botón más grande y cuadrado con bordes redondeados */
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;       
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;     /* Quitar subrayado */
+  transition: all 0.2s ease;
+  border: 1px solid transparent; /* Prepara el borde para el hover */
+}
+
+.home-button:hover {
+  background-color: #007bff; /* Al pasar el mouse se pone azul fuerte */
+  color: white;              /* El ícono se vuelve blanco */
+  transform: translateY(-3px); /* Se eleva un poco */
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3); /* Sombra para dar profundidad */
+}
+
+/* Asegura que los elementos del menú estén alineados */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* Espacio entre la casita y el avatar */
+}
+
 .dashboard-header {
   background: white;
   color: #343a40;
@@ -120,13 +154,19 @@ export default {
 .logo {
   display: flex;
   align-items: center;
-  font-size: 1.8rem;
+  gap: 0.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
 }
-.logo i {
-  margin-right: 0.8rem;
-  font-size: 2.2rem;
-  color: #007bff;
+.logo-img {
+  width: 78px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 50%;
+  background: white;     
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+  display: inline-block;
 }
 .nav-tabs {
   display: flex;
