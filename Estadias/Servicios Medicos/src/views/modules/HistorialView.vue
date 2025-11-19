@@ -56,7 +56,7 @@
             <div class="input-group input-group-sm">
               <span class="input-group-text"><i class="fas fa-user"></i></span>
               <select class="form-select" v-model="filtros.id_usuario">
-                <option :value="null">Todos los usuarios</option>
+                <option :value="null">Todos</option>
                 <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre_completo }}</option>
               </select>
             </div>
@@ -66,7 +66,7 @@
             <div class="input-group input-group-sm">
               <span class="input-group-text"><i class="fas fa-play-circle"></i></span>
               <select class="form-select" v-model="filtros.accion">
-                <option value="">Todas las acciones</option>
+                <option value="">Todas</option>
                 <option value="CREAR">Crear</option>
                 <option value="EDITAR">Editar</option>
                 <option value="ELIMINAR">Eliminar</option>
@@ -78,7 +78,7 @@
             <div class="input-group input-group-sm">
               <span class="input-group-text"><i class="fas fa-database"></i></span>
               <select class="form-select" v-model="filtros.tipo_entidad">
-                <option value="">Todas las entidades</option>
+                <option value="">Todas</option>
                 <option value="PACIENTE">Pacientes</option>
                 <option value="USUARIO">Usuarios</option>
                 <option value="REGISTRO">Registros</option>
@@ -92,9 +92,12 @@
             <button class="btn btn-outline-secondary btn-sm" @click="limpiarFiltros" title="Limpiar">
               <i class="fas fa-undo"></i>
             </button>
-            <button class="btn btn-outline-success btn-sm" @click="exportarHistorial" title="Exportar">
-              <i class="fas fa-download"></i>
-            </button>
+            <div class="btn-group">
+              <button class="btn btn-outline-danger btn-sm" @click="exportarHistorialPDF" 
+                      :disabled="cargando" title="Exportar a PDF">
+                <i class="fas fa-file-pdf"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -253,7 +256,7 @@
                       <i class="fas fa-hashtag me-1 text-muted"></i>
                       {{ itemSeleccionado.tipo_entidad }} #{{ itemSeleccionado.id_entidad }}
                     </span>
-                    <small class="text-muted">Hace:... {{ calcularDuracion(itemSeleccionado.timestamp) }}</small>
+                    <small class="text-muted">{{ calcularDuracion(itemSeleccionado.timestamp) }}</small>
                   </div>
                 </div>
               </div>
@@ -374,9 +377,14 @@
               <i class="fas" :class="expandedView ? 'fa-compress' : 'fa-expand'"></i>
               {{ expandedView ? 'Vista compacta' : 'Vista completa' }}
             </button>
-            <button class="btn btn-primary px-4" @click="exportarDetalle">
-              <i class="fas fa-download me-2"></i>Exportar
-            </button>
+            <div class="btn-group">
+              <button class="btn btn-outline-success px-4" @click="exportarDetalleExcel">
+                <i class="fas fa-file-excel me-2"></i>Excel
+              </button>
+              <button class="btn btn-outline-danger px-4" @click="exportarDetallePDF">
+                <i class="fas fa-file-pdf me-2"></i>PDF
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -387,6 +395,9 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '@/services/api';
 import { Modal } from 'bootstrap';
 
@@ -456,7 +467,7 @@ const cambiosParseados = computed(() => {
   }).filter(i => i !== null);
 });
 
-// Métodos
+// Métodos principales
 const cargarUsuarios = async () => {
   try { 
     const res = await api.get('/usuarios'); 
@@ -532,6 +543,256 @@ const verDetalle = (item) => {
 
 const toggleExpandedView = () => {
   expandedView.value = !expandedView.value;
+};
+
+// ==================== FUNCIONES DE EXPORTACIÓN ====================
+
+// Exportar historial completo a Excel
+const exportarHistorialExcel = async () => {
+  try {
+    cargando.value = true;
+    
+    // Obtener todos los datos sin paginación
+    const params = { 
+      ...filtros.value,
+      page: 1, 
+      limit: 10000 
+    };
+    
+    Object.keys(params).forEach(key => { 
+      if (params[key] === '' || params[key] === null || params[key] === undefined) 
+        delete params[key]; 
+    });
+
+    const res = await api.get('/historial', { params });
+    const datos = res.data.data;
+
+    // Preparar datos para Excel
+    const datosExcel = datos.map(item => ({
+      'Fecha': formatDateTime(item.timestamp),
+      'Hora': formatTime(item.timestamp),
+      'Usuario': item.nombre_usuario || 'Sistema',
+      'Acción': item.accion,
+      'Entidad': item.tipo_entidad,
+      'ID Entidad': item.id_entidad,
+      'Detalles': item.detalles || 'Sin detalles',
+      'Dirección IP': item.ip_address || 'N/A'
+    }));
+
+    // Crear workbook y worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(datosExcel);
+
+    // Ajustar anchos de columnas
+    const colWidths = [
+      { wch: 20 }, // Fecha
+      { wch: 10 }, // Hora
+      { wch: 25 }, // Usuario
+      { wch: 10 }, // Acción
+      { wch: 15 }, // Entidad
+      { wch: 12 }, // ID Entidad
+      { wch: 50 }, // Detalles
+      { wch: 15 }  // IP
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+
+    // Generar y descargar
+    XLSX.writeFile(wb, `historial_actividad_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+  } catch (error) {
+    console.error('Error exportando a Excel:', error);
+    alert('Error al exportar el historial a Excel');
+  } finally {
+    cargando.value = false;
+  }
+};
+
+// Exportar historial completo a PDF
+const exportarHistorialPDF = async () => {
+  try {
+    cargando.value = true;
+    
+    // Obtener datos
+    const params = { 
+      ...filtros.value,
+      page: 1, 
+      limit: 1000 // PDFs funcionan mejor con menos datos
+    };
+    
+    Object.keys(params).forEach(key => { 
+      if (params[key] === '' || params[key] === null || params[key] === undefined) 
+        delete params[key]; 
+    });
+
+    const res = await api.get('/historial', { params });
+    const datos = res.data.data;
+
+    // Crear PDF
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('HISTORIAL DE ACTIVIDAD', 105, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Sistema de Registro Prehospitalario', 105, 22, { align: 'center' });
+    doc.text(`Generado el: ${new Date().toLocaleDateString('es-MX')}`, 105, 28, { align: 'center' });
+
+    // Preparar datos para la tabla
+    const tableData = datos.map(item => [
+      formatDate(item.timestamp),
+      formatTime(item.timestamp),
+      item.nombre_usuario || 'Sistema',
+      item.accion,
+      `${item.tipo_entidad} #${item.id_entidad}`,
+      item.detalles ? (item.detalles.length > 50 ? item.detalles.substring(0, 50) + '...' : item.detalles) : 'Sin detalles'
+    ]);
+
+    // Crear tabla
+    autoTable(doc, {
+      head: [['Fecha', 'Hora', 'Usuario', 'Acción', 'Entidad', 'Detalles']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { 
+        fillColor: [66, 114, 196],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: { fillColor: [240, 240, 240] },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 15 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 'auto' }
+      },
+      margin: { top: 35 }
+    });
+
+    // Estadísticas en pie de página
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text(`Total de registros: ${datos.length} | Creaciones: ${datos.filter(d => d.accion === 'CREAR').length} | ` +
+             `Ediciones: ${datos.filter(d => d.accion === 'EDITAR').length} | ` +
+             `Eliminaciones: ${datos.filter(d => d.accion === 'ELIMINAR').length}`, 
+             14, finalY);
+
+    // Guardar PDF
+    doc.save(`historial_actividad_${new Date().toISOString().split('T')[0]}.pdf`);
+    
+  } catch (error) {
+    console.error('Error exportando a PDF:', error);
+    alert('Error al exportar el historial a PDF');
+  } finally {
+    cargando.value = false;
+  }
+};
+
+// Exportar detalle a PDF
+const exportarDetallePDF = () => {
+  if (!itemSeleccionado.value) return;
+
+  const doc = new jsPDF();
+  const item = itemSeleccionado.value;
+
+  // Título
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DETALLE DE ACTIVIDAD', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sistema de Registro Prehospitalario', 105, 27, { align: 'center' });
+
+  // Información general
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INFORMACIÓN GENERAL', 20, 40);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  
+  let yPosition = 50;
+  const addLine = (label, value, x = 20) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${label}:`, x, yPosition);
+    doc.setFont('helvetica', 'normal');
+    doc.text(value, x + 25, yPosition);
+    yPosition += 7;
+  };
+
+  addLine('Acción', getAccionText(item.accion));
+  addLine('Entidad', `${item.tipo_entidad} #${item.id_entidad}`);
+  addLine('Usuario', item.nombre_usuario || 'Sistema');
+  addLine('Fecha', formatDateTime(item.timestamp));
+  if (item.ip_address) {
+    addLine('Dirección IP', item.ip_address);
+  }
+
+  yPosition += 10;
+
+  // Detalles de cambios
+  if (item.accion === 'EDITAR' && cambiosParseados.value.length > 0) {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CAMBIOS REALIZADOS', 20, yPosition);
+    yPosition += 10;
+
+    // Preparar datos para tabla de cambios
+    const tableData = cambiosParseados.value.map(cambio => [
+      formatFieldName(cambio.campo),
+      cambio.anterior || '(Vacío)',
+      cambio.nuevo || '(Vacío)'
+    ]);
+
+    autoTable(doc, {
+      head: [['Campo', 'Valor Anterior', 'Valor Nuevo']],
+      body: tableData,
+      startY: yPosition,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { 
+        fillColor: [66, 114, 196],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 40, fontStyle: 'bold' },
+        1: { cellWidth: 65, textColor: [220, 53, 69] },
+        2: { cellWidth: 65, textColor: [25, 135, 84], fontStyle: 'bold' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 10;
+  } else {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DESCRIPCIÓN', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const descripcion = item.detalles || 'Sin detalles adicionales';
+    const splitText = doc.splitTextToSize(descripcion, 170);
+    doc.text(splitText, 20, yPosition);
+    yPosition += (splitText.length * 5) + 10;
+  }
+
+  // Pie de página
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.text(`Generado el: ${new Date().toLocaleString('es-MX')}`, 20, yPosition + 10);
+  doc.text('Sistema de Registro Prehospitalario - Módulo de Auditoría', 105, yPosition + 10, { align: 'center' });
+
+  doc.save(`detalle_${item.tipo_entidad}_${item.id_entidad}.pdf`);
 };
 
 // Helpers de Formato
@@ -642,16 +903,6 @@ const calcularDuracion = (timestamp) => {
   return 'Hace unos momentos';
 };
 
-const exportarHistorial = () => {
-  // Implementar exportación a CSV/Excel
-  console.log('Exportar historial completo');
-};
-
-const exportarDetalle = () => {
-  // Implementar exportación del detalle
-  console.log('Exportar detalle del registro');
-};
-
 // Watchers
 watch(() => page.value, () => {
   cargarHistorial();
@@ -668,13 +919,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Tus estilos CSS existentes se mantienen igual */
 .historial-container { 
   max-width: 1400px; 
   margin: 0 auto; 
   padding: 1rem; 
 }
 
-/* Header Mejorado */
 .page-header-compact { 
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
   color: white; 
@@ -746,7 +997,6 @@ onMounted(() => {
   display: block;
 }
 
-/* Filtros Mejorados */
 .filters-panel-compact { 
   background: white; 
   border-radius: 12px; 
@@ -776,7 +1026,6 @@ onMounted(() => {
   border-color: #e9ecef;
 }
 
-/* Tabla Mejorada */
 .custom-table thead th { 
   background-color: #f8f9fa; 
   color: #6c757d; 
@@ -803,7 +1052,6 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* Badges de Acción */
 .badge-action { 
   padding: 0.5em 0.75em; 
   font-size: 0.7em; 
@@ -840,7 +1088,6 @@ onMounted(() => {
   border: 1px solid #d3d6d8;
 }
 
-/* Avatares */
 .avatar-circle { 
   width: 36px; 
   height: 36px; 
@@ -870,7 +1117,6 @@ onMounted(() => {
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
-/* Modal Mejorado */
 .modal-xl {
   max-width: 950px;
 }
@@ -889,7 +1135,6 @@ onMounted(() => {
   color: #343a40 !important; 
 }
 
-/* Sección de Cambios */
 .changes-section {
   max-height: 500px;
   overflow-y: auto;
@@ -935,7 +1180,6 @@ onMounted(() => {
   border-color: rgba(25, 135, 84, 0.2);
 }
 
-/* Scroll personalizado */
 .changes-container::-webkit-scrollbar {
   width: 8px;
 }
@@ -954,7 +1198,6 @@ onMounted(() => {
   background: #a8a8a8;
 }
 
-/* Responsive */
 @media (max-width: 1200px) {
   .filters-grid {
     grid-template-columns: 1fr 1fr 1fr;
@@ -1002,5 +1245,32 @@ onMounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Estilos para botones de exportación */
+.btn-group .btn {
+  border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.btn-outline-success:hover {
+  background-color: #198754;
+  border-color: #198754;
+  transform: translateY(-1px);
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  transform: translateY(-1px);
 }
 </style>
