@@ -159,8 +159,8 @@ export default {
   font-weight: 700;
 }
 .logo-img {
-  width: 78px;
-  height: 78px;
+  width: 90px;
+  height: 90px;
   object-fit: cover;
   border-radius: 50%;
   background: white;     

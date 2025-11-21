@@ -145,7 +145,7 @@
             <h4>No hay registros para el día de hoy</h4>
             <p class="text-muted">Haz clic en "Nuevo Registro" para crear el primero del día.</p>
             <button class="btn btn-primary mt-3" @click="abrirModalNuevo">
-              <i class="fas fa-plus me-2"></i>Crear Nuevo Registro
+              <i class="fas fa-plus me-2"></i> Nuevo Registro
             </button>
           </div>
         </div>

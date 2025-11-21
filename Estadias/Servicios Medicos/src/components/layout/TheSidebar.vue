@@ -6,7 +6,7 @@
 
       <router-link to="/registros" :class="['sidebar-button', { active: $route.path.startsWith('/registros') }]">
         <i class="fas fa-ambulance"></i>
-        <span class="button-text">Prehospitalario</span>
+        <span class="button-text">Reportes</span>
       </router-link>
 
             <router-link to="/eventos" custom v-slot="{ navigate, isActive }">
@@ -26,7 +26,7 @@
       <router-link to="/reportes" custom v-slot="{ navigate, isActive}">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
           <i class="fas fa-chart-line"></i>
-          <span class="button-text">Reportes</span>
+          <span class="button-text">Estadisticas</span>
         </button>
       </router-link>
       

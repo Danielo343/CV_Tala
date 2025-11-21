@@ -5,7 +5,7 @@
       <div class="row align-items-center">
         <div class="col-md-8">
           <h1 class="display-5 fw-bold text-dark mb-2">Hola, {{ firstName }} 👋</h1>
-          <p class="text-muted fs-5">Bienvenido al Sistema de Control de Servicios Médicos.</p>
+          <p class="text-muted fs-5">Bienvenido al Sistema de Creación de FRAP.</p>
           <p class="text-secondary"><small>{{ currentDate }}</small></p>
         </div>
         <div class="col-md-4 text-end d-none d-md-block">
@@ -37,7 +37,7 @@
         <div class="stat-card bg-white shadow-sm border-0 p-4 rounded-4 h-100 position-relative overflow-hidden">
           <div class="d-flex justify-content-between align-items-start position-relative z-1">
             <div>
-              <p class="text-muted fw-bold small text-uppercase mb-1">Eventos Registrados</p>
+              <p class="text-muted fw-bold small text-uppercase mb-1">Eventos Totales</p>
               <h2 class="display-4 fw-bold text-success mb-0">{{ stats.eventosTotal }}</h2>
             </div>
             <div class="icon-box bg-success-subtle text-success rounded-circle p-3">
@@ -107,7 +107,7 @@
               <i class="fas fa-chart-pie fa-lg"></i>
             </div>
             <div>
-              <h6 class="fw-bold mb-0 text-dark">Reportes</h6>
+              <h6 class="fw-bold mb-0 text-dark">Estadisticas</h6>
               <small class="text-muted">Ver estadísticas</small>
             </div>
           </div>
