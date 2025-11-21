@@ -3,7 +3,7 @@
     <div class="header-content">
       <div class="logo">
         <img src="/ServiciosMedicos.png" alt="Servicios Medicos" class="logo-img" />
-        <span>CV Tala</span>
+        <span>Dirección de Atención Medica Prehospitalaria</span>
       </div>
       <!-- --- MENÚ DE USUARIO ACTUALIZADO --- -->
 <div class="user-menu">

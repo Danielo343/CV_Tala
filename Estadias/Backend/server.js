@@ -583,6 +583,8 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         cc.nombre AS causa_clinica,
         ua.nombre AS unidad_asignada_nombre,
         et.nombre AS estado_traslado, -- <--- ¡NUEVO! Traemos la razón de no traslado
+        agc.nombre AS agente_causante_general_nombre, -- <--- ¡IMPORTANTE PARA EL REPORTE!
+        a.tipo_activacion_otro, -- <--- ¡IMPORTANTE PARA EL REPORTE!
         
         a.id_tipo_activacion,
         a.id_causa_clinica,
@@ -591,6 +593,7 @@ app.get('/api/activaciones', verificarToken, async (req, res) => {
         activaciones AS a
       ${joins}
       LEFT JOIN estado_traslado AS et ON a.id_estado_traslado = et.id -- <--- ¡NUEVO! Unimos la tabla
+      LEFT JOIN agente_causante_general AS agc ON a.id_agente_causante_general = agc.id
     `;
 
     if (whereClauses.length > 0) {
@@ -1630,11 +1633,16 @@ app.get('/api/reportes/origen', [verificarToken], async (req, res) => {
     const query = `
       SELECT 
         COALESCE(T.nombre, 'Sin Asignar') AS nombre, 
-        COUNT(A.id) AS total 
+        COUNT(A.id) AS total,
+        -- 🎯 CORRECCIÓN APLICADA: Si la categoría es 'Otro', agregamos los valores de tipo_activacion_otro
+        CASE
+          WHEN COALESCE(T.nombre, 'Sin Asignar') = 'Otro' THEN STRING_AGG(A.tipo_activacion_otro, ', ' ORDER BY A.tipo_activacion_otro)
+          ELSE COALESCE(T.nombre, 'Sin Asignar')
+        END AS desglose
       FROM activaciones A 
       LEFT JOIN tipo_activacion T ON A.id_tipo_activacion = T.id 
       WHERE A.fecha_activacion BETWEEN $1 AND $2 
-      GROUP BY nombre 
+      GROUP BY COALESCE(T.nombre, 'Sin Asignar') -- Blindaje: Agrupamos por el campo COALESCED
       ORDER BY total DESC;
     `;
     const result = await pool.query(query, [fecha_inicio, fecha_fin]);
@@ -1787,6 +1795,9 @@ app.post('/api/config/:catalogo', [verificarToken, adminOnly], async (req, res) 
     catalogCache = null;
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.code === '23505') { 
+      return res.status(409).json({ error: 'El nombre ya existe en este catálogo' });
+    }
     console.error(`Error al crear en ${catalogo}:`, err);
     res.status(500).json({ error: 'Error al crear (posible duplicado)' });
   }
@@ -1807,6 +1818,9 @@ app.put('/api/config/:catalogo/:id', [verificarToken, adminOnly], async (req, re
     catalogCache = null;
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.code === '23505') { 
+      return res.status(409).json({ error: 'El nombre ya existe en este catálogo' });
+    }
     console.error(`Error al editar en ${catalogo}:`, err);
     res.status(500).json({ error: 'Error al actualizar' });
   }

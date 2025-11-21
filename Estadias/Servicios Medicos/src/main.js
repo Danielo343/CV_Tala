@@ -11,6 +11,12 @@ import 'bootstrap'
 // Importar Font Awesome
 import '@fortawesome/fontawesome-free/css/all.css'
 
+// --- 👇 REGISTRO DE CHART.JS Y DATALABELS (NUEVO) 👇 ---
+import { Chart, registerables } from 'chart.js'; // Necesario para registrar globalmente
+import ChartDataLabels from 'chartjs-plugin-datalabels'; // ¡NUEVO!
+Chart.register(...registerables, ChartDataLabels); // ¡MODIFICADO!
+// --- 👆 FIN DEL REGISTRO 👆 ---
+
 // --- 👇 LÓGICA DE VERIFICACIÓN AÑADIDA 👇 ---
 
 async function tryVerifyLogin() {

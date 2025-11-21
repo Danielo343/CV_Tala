@@ -1,7 +1,21 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const generarFichaPDF = (data) => {
+// 1. Función auxiliar para cargar la imagen asíncronamente
+const cargarImagen = (src) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.warn(`No se pudo cargar la imagen: ${src}`);
+      resolve(null); // Si falla, no rompe el PDF, solo no muestra la imagen
+    };
+  });
+};
+
+// 2. La función principal ahora es ASYNC
+export const generarFichaPDF = async (data) => {
   if (!data) return;
 
   const doc = new jsPDF();
@@ -13,7 +27,7 @@ export const generarFichaPDF = (data) => {
   // --- COLORES ---
   const colorPrimary = [41, 128, 185]; // Azul Médico
   const colorSecondary = [52, 73, 94]; // Gris Oscuro
-  const colorAccent = [52, 73, 94];   // Rojo (Para Folio)
+  const colorAccent = [222, 45, 4];    // Gris/Rojo (Para Folio)
   const colorLight = [245, 245, 245];  // Fondo Gris Claro
 
   // --- 1. ENCABEZADO ---
@@ -21,29 +35,38 @@ export const generarFichaPDF = (data) => {
   doc.setFillColor(...colorPrimary);
   doc.rect(0, 0, pageWidth, 35, 'F');
 
-  // Logo (Simulado: Cruz de la Vida)
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(2);
-  doc.line(25, 10, 25, 25); // Vertical
-  doc.line(17.5, 17.5, 32.5, 17.5); // Horizontal
-  doc.setLineWidth(0.5);
-  doc.circle(25, 17.5, 10, 'S');
+// --- LOGO DE LA EMPRESA (AJUSTADO) ---
+  const logoUrl = '/ServiciosMedicos.png'; // Asegúrate que este es el nombre correcto en /public
+  const logoImg = await cargarImagen(logoUrl);
 
-  // --- ARREGLO: Títulos con límite de ancho ---
-  // Calculamos el ancho disponible para no chocar con el cuadro del folio
-  // Ancho página (210) - Margen Izq (45) - Ancho Cuadro Folio (50) - Margen Der (10) = ~105mm
+  if (logoImg) {
+    // 1. Círculo Blanco (Fondo)
+    // Aumentamos el radio de 11 a 13 para dar más espacio
+    doc.setFillColor(255, 255, 255);
+    doc.circle(20, 17.5, 13, 'F'); 
+
+    // 2. Imagen del Logo
+    // Esto crea un borde blanco limpio alrededor del logo.
+    const logoSize = 24; 
+    const logoX = 20 - (logoSize / 2); 
+    const logoY = 17.5 - (logoSize / 2); 
+    doc.addImage(logoImg, 'PNG', logoX, logoY, logoSize, logoSize);
+
+  }
+
+  // --- TÍTULOS ---
+  // Ajustamos margen izquierdo (50) para dar espacio al nuevo logo
   const titleMaxWidth = 105;
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); // Un poco más pequeño para asegurar que quepa
+  doc.setFontSize(16); 
   doc.setFont('helvetica', 'bold');
-  doc.text('SERVICIOS MÉDICOS MUNICIPALES', 45, 15, { maxWidth: titleMaxWidth });
+  doc.text('SERVICIOS MÉDICOS MUNICIPALES', 40, 15, { maxWidth: titleMaxWidth });
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  // Este es el texto que se encimaba. Ahora tiene maxWidth.
-  doc.text('DEPARTAMENTO DE ATENCIÓN PREHOSPITALARIA - TALA, JALISCO', 40, 20, { maxWidth: titleMaxWidth });
-  doc.text('Reporte de Servicio de Ambulancia', 45, 30, { maxWidth: titleMaxWidth });
+  doc.text('DIRECCIÓN DE ATENCIÓN PREHOSPITALARIA - TALA, JALISCO', 40, 20, { maxWidth: titleMaxWidth });
+  doc.text('Reporte de Servicio de Ambulancia', 40, 30, { maxWidth: titleMaxWidth });
 
   // --- Cuadro de Folio (Tipo Sello) ---
   doc.setFillColor(255, 255, 255);
@@ -51,25 +74,31 @@ export const generarFichaPDF = (data) => {
   
   doc.setTextColor(...colorSecondary);
   doc.setFontSize(8);
-  // Coordenadas ajustadas para que no se encimen internamente
   doc.text('FOLIO INTERNO', pageWidth - 35, 13, { align: 'center' });
   
-  doc.setTextColor(...colorAccent); // Rojo
+  doc.setTextColor(...colorAccent);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(data.num_reporte_local, pageWidth - 35, 23, { align: 'center' });
+  doc.text(data.num_reporte_local || 'S/N', pageWidth - 35, 23, { align: 'center' });
 
   // --- 2. INFORMACIÓN DEL SERVICIO (Tabla Compacta) ---
-  const fecha = new Date(data.fecha_activacion).toLocaleDateString('es-MX');
+  let fechaTexto = 'N/D';
+  if (data.fecha_activacion) {
+      const fechaObj = new Date(data.fecha_activacion);
+      // Ajuste simple de zona horaria
+      const fechaAjustada = new Date(fechaObj.getTime() + fechaObj.getTimezoneOffset() * 60000);
+      fechaTexto = fechaAjustada.toLocaleDateString('es-MX');
+  }
+
   let currentY = 42;
 
   autoTable(doc, {
     startY: currentY,
     head: [['DATOS GENERALES DEL SERVICIO', '', '', '']],
     body: [
-      ['FECHA:', fecha, 'HORA:', data.hora_activacion ? data.hora_activacion.substring(0, 5) : 'N/D'],
+      ['FECHA:', fechaTexto, 'HORA:', data.hora_activacion ? data.hora_activacion.substring(0, 5) : 'N/D'],
       ['UNIDAD:', data.unidad_asignada_nombre || 'N/D', 'TIPO:', data.tipo_activacion_nombre || 'N/D'],
-      ['FOLIO EXTERNO:', data.num_reporte_externo || '---', 'ORIGEN:', data.origen_reporte],
+      ['FOLIO EXTERNO:', data.num_reporte_externo || '---', 'ORIGEN:', data.origen_reporte || 'N/D'],
     ],
     theme: 'grid',
     headStyles: { fillColor: colorSecondary, textColor: 255, fontStyle: 'bold', halign: 'center' },
@@ -178,7 +207,7 @@ export const generarFichaPDF = (data) => {
   
   doc.line(40, firmaY, 90, firmaY);
   doc.setFontSize(8);
-  doc.text('FIRMA PARAMÉDICO', 65, firmaY + 5, { align: 'center' });
+  doc.text('FIRMA DIRECCIÓN', 65, firmaY + 5, { align: 'center' });
 
   doc.line(120, firmaY, 170, firmaY);
   doc.text('FIRMA RECIBE / TESTIGO', 145, firmaY + 5, { align: 'center' });
@@ -186,7 +215,7 @@ export const generarFichaPDF = (data) => {
   // Pie de página
   doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text(`Generado el: ${new Date().toLocaleString()} | Sistema CV Tala`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.text(`Generado el: ${new Date().toLocaleString()} | Sistema De Dirección Prehospitalaria Tala.`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
   doc.save(`Ficha_${data.num_reporte_local}.pdf`);
 };
