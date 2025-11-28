@@ -22,8 +22,8 @@
           <span class="button-text">Consultas</span>
         </button>
       </router-link>
-      
-      <router-link to="/reportes" custom v-slot="{ navigate, isActive}">
+
+      <router-link to="/reportes" custom v-slot="{ navigate, isActive }">
         <button :class="['sidebar-button', { active: isActive }]" @click="navigate">
           <i class="fas fa-chart-line"></i>
           <span class="button-text">Estadisticas</span>

@@ -511,10 +511,14 @@ const setFiltroRapido = (periodo) => {
   }
   
   switch (periodoFinal) {
-    case 'semana': inicio.setDate(hoy.getDate() - 6); break;
+    case 'semana': 
+      inicio.setDate(hoy.getDate() - 6); 
+      break;
     case 'mes': 
       inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()); 
+      // CORRECCIÓN AQUÍ:
+      // Usamos hoy.getMonth() + 1 para ir al mes siguiente, y el día 0 para obtener el último día del mes actual
+      fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0); 
       break;
     case 'anio':
       inicio = new Date(hoy.getFullYear(), 0, 1);

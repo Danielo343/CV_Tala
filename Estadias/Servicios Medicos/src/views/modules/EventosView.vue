@@ -11,7 +11,6 @@
     </div>
 
     <div class="main-content">
-      <!-- Formulario de Registro -->
       <div v-if="!showList" class="form-container">
         <div class="form-header">
           <h2>{{ isEditing ? 'Editar Evento' : 'Registro de Evento o Simulacro' }}</h2>
@@ -23,7 +22,6 @@
         </div>
 
         <form @submit.prevent="registrarEvento" class="event-form">
-          <!-- Información Básica del Evento -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-info-circle icon-title"></i>
@@ -119,7 +117,6 @@
             </div>
           </div>
 
-          <!-- Ubicación y Organización -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-map-marker-alt icon-title"></i>
@@ -172,7 +169,6 @@
             </div>
           </div>
 
-          <!-- Detalles Específicos -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-clipboard-list icon-title"></i>
@@ -252,7 +248,6 @@
             </div>
           </div>
 
-          <!-- Unidades que Atienden -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-ambulance icon-title"></i>
@@ -288,7 +283,6 @@
             </div>
           </div>
 
-          <!-- Personal Participante -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-users icon-title"></i>
@@ -306,7 +300,6 @@
             </div>
           </div>
 
-          <!-- Reporte y Lecciones -->
           <div class="form-section card-light">
             <h3 class="section-title">
               <i class="fas fa-file-alt icon-title"></i>
@@ -338,7 +331,6 @@
             </div>
           </div>
 
-          <!-- Botones de Acción -->
           <div class="form-actions">
             <button type="button" @click="toggleView" class="btn btn-secondary">
               <i class="fas fa-times me-2"></i>
@@ -353,7 +345,6 @@
         </form>
       </div>
 
-      <!-- Lista de Eventos -->
       <div v-else>
         <div class="content-header">
           <h2 class="content-title">Eventos Registrados</h2>
@@ -420,7 +411,7 @@
             </div>
             
             <div class="evento-actions">
-              <button class="btn btn-sm btn-outline-primary">
+              <button @click="verEvento(evento)" class="btn btn-sm btn-outline-primary">
                 <i class="fas fa-eye me-1"></i>Ver
               </button>
               <button @click="editarEvento(evento)" class="btn btn-sm btn-outline-secondary">
@@ -434,12 +425,107 @@
         </div>
       </div>
     </div>
+
+    <div class="modal fade" id="modalVerEvento" tabindex="-1" aria-hidden="true" ref="modalVerEventoRef">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-light">
+            <h5 class="modal-title text-primary fw-bold">
+              <i class="fas fa-calendar-day me-2"></i>Detalle del Evento
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          
+          <div class="modal-body" v-if="eventoSeleccionado">
+            <div class="text-center mb-4">
+              <h3 class="fw-bold mb-2">{{ eventoSeleccionado.nombre_evento }}</h3>
+              <span :class="['badge', getBadgeClass(eventoSeleccionado.estado), 'fs-6']">
+                {{ formatEstado(eventoSeleccionado.estado) }}
+              </span>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="card h-100 border-0 bg-light">
+                  <div class="card-body">
+                    <h6 class="card-title text-primary border-bottom pb-2">Información General</h6>
+                    <ul class="list-unstyled mt-3 mb-0">
+                      <li class="mb-2"><strong>Tipo:</strong> {{ getTipoEvento(eventoSeleccionado.id_tipo_evento) }}</li>
+                      <li class="mb-2"><strong>Fecha:</strong> {{ formatFecha(eventoSeleccionado.fecha) }}</li>
+                      <li class="mb-2"><strong>Horario:</strong> {{ eventoSeleccionado.hora_inicio }} - {{ eventoSeleccionado.hora_fin || 'N/A' }}</li>
+                      <li class="mb-2"><strong>Lugar:</strong> {{ eventoSeleccionado.lugar }}</li>
+                      <li class="mb-2"><strong>Dirección:</strong> {{ eventoSeleccionado.direccion || 'N/A' }}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="card h-100 border-0 bg-light">
+                  <div class="card-body">
+                    <h6 class="card-title text-primary border-bottom pb-2">Organización y Recursos</h6>
+                    <ul class="list-unstyled mt-3 mb-0">
+                      <li class="mb-2"><strong>Organizador:</strong> {{ eventoSeleccionado.organizador || 'N/A' }}</li>
+                      <li class="mb-2"><strong>Responsable:</strong> {{ getNombrePersonal(eventoSeleccionado.id_responsable) }}</li>
+                      <li class="mb-2"><strong>Aforo Esperado:</strong> {{ eventoSeleccionado.participantes_esperados || 0 }} personas</li>
+                      <li class="mb-2">
+                        <strong>Recursos Asignados:</strong><br>
+                        <small class="text-muted">
+                          Ambulancias: {{ eventoSeleccionado.ambulancias_asignadas || 0 }} | 
+                          Médicos: {{ eventoSeleccionado.personal_medico || 0 }} | 
+                          Apoyo: {{ eventoSeleccionado.personal_apoyo || 0 }}
+                        </small>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="mb-3" v-if="eventoSeleccionado.descripcion">
+                  <label class="fw-bold text-secondary">Descripción:</label>
+                  <p class="bg-light p-3 rounded">{{ eventoSeleccionado.descripcion }}</p>
+                </div>
+                
+                <div class="mb-3" v-if="eventoSeleccionado.objetivos">
+                  <label class="fw-bold text-secondary">Objetivos:</label>
+                  <p class="bg-light p-3 rounded">{{ eventoSeleccionado.objetivos }}</p>
+                </div>
+              </div>
+
+              <div class="col-md-6" v-if="eventoSeleccionado.unidades_atienden && eventoSeleccionado.unidades_atienden.length">
+                <h6 class="text-primary border-bottom pb-2"><i class="fas fa-ambulance me-2"></i>Unidades Asignadas</h6>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <span v-for="u in eventoSeleccionado.unidades_atienden" :key="u" class="badge bg-info text-dark">
+                    {{ u }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="col-md-6" v-if="personalNombres.length">
+                <h6 class="text-primary border-bottom pb-2"><i class="fas fa-user-md me-2"></i>Personal Participante</h6>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <span v-for="p in personalNombres" :key="p" class="badge bg-secondary">
+                    {{ p }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue'; // <-- 1. Importamos watch y onUnmounted
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import api from '@/services/api';
+import { Modal } from 'bootstrap'; // <-- IMPORTANTE: Importar Modal
 
 export default {
   name: 'EventosView',
@@ -459,10 +545,15 @@ export default {
     const mensaje = ref('');
     const error = ref(false);
     
-    // --- 2. Añadimos el timer para debounce ---
     const filtroBusqueda = ref('');
     const filtroTipo = ref(null);
     const debounceTimer = ref(null);
+
+    // Variables nuevas para el modal
+    const modalVerEventoRef = ref(null);
+    let modalVerEventoInstance = null;
+    const eventoSeleccionado = ref(null);
+    const personalNombres = ref([]);
 
     const unidadesAtencion = computed(() => {
         return (catalogos.value.unidades_transporte || []).map(u => ({
@@ -485,7 +576,6 @@ export default {
       );
     });
 
-    // --- 3. Simplificamos el filtro del frontend (la API hace el trabajo) ---
     const eventosFiltrados = computed(() => {
       return eventos.value;
     });
@@ -552,7 +642,7 @@ export default {
     const toggleView = () => {
       showList.value = !showList.value;
       if (showList.value) {
-        fetchEventos(); // Recargamos al volver a la lista
+        fetchEventos();
         isEditing.value = false;
       } else {
         mensaje.value = '';
@@ -582,17 +672,13 @@ export default {
         console.error('Error cargando catálogos', err);
         mensaje.value = 'No se pudieron cargar las listas de catálogos.';
         error.value = true;
-        
         catalogos.value.tipos_evento = [];
         catalogos.value.categorias = [];
         catalogos.value.personal = [];
         catalogos.value.unidades_transporte = [];
-      } finally {
-          // No ponemos loadingList.value = false aquí, dejamos que fetchEventos lo haga
       }
     };
 
-    // --- 4. Modificamos fetchEventos para que use los filtros ---
     const fetchEventos = async () => {
       loadingList.value = true;
       try {
@@ -735,22 +821,64 @@ export default {
       return tipo ? tipo.nombre : 'Sin tipo';
     };
 
-    // --- 5. Añadimos el watch para el debounce ---
+    // Funciones Nuevas para el Modal "Ver"
+    const getNombrePersonal = (id) => {
+      if (!id) return 'N/A';
+      const p = (catalogos.value.personal || []).find(x => x.id == id);
+      return p ? p.nombre : 'Desconocido';
+    };
+
+    const getBadgeClass = (estado) => {
+      const clases = {
+        planificado: 'bg-warning text-dark',
+        en_curso: 'bg-info text-dark',
+        completado: 'bg-success',
+        cancelado: 'bg-danger'
+      };
+      return clases[estado] || 'bg-secondary';
+    };
+
+    const verEvento = async (evento) => {
+      try {
+        // Cargamos detalles completos (incluyendo arrays de IDs)
+        const res = await api.get(`/eventos/${evento.id}`);
+        eventoSeleccionado.value = res.data;
+
+        // Mapeamos los IDs de personal a Nombres reales usando el catálogo local
+        if (eventoSeleccionado.value.personal_participante_ids) {
+          personalNombres.value = eventoSeleccionado.value.personal_participante_ids.map(id => {
+            return getNombrePersonal(id);
+          });
+        } else {
+          personalNombres.value = [];
+        }
+
+        // Abrimos el modal
+        if (!modalVerEventoInstance && modalVerEventoRef.value) {
+          modalVerEventoInstance = new Modal(modalVerEventoRef.value);
+        }
+        modalVerEventoInstance.show();
+
+      } catch (err) {
+        console.error("Error al cargar detalles del evento", err);
+        alert("No se pudieron cargar los detalles del evento.");
+      }
+    };
+
     watch(filtroBusqueda, (newValue, oldValue) => {
       if (debounceTimer.value) clearTimeout(debounceTimer.value);
       debounceTimer.value = setTimeout(() => {
         if (!loadingList.value) {
           fetchEventos();
         }
-      }, 400); // 400ms debounce
+      }, 400); 
     });
 
     onMounted(() => {
-      fetchCatalogos(); // Carga catálogos primero
-      fetchEventos();  // Luego carga eventos (ya con filtros vacíos)
+      fetchCatalogos(); 
+      fetchEventos();  
     });
     
-    // --- 6. Añadimos onUnmounted para limpiar el timer ---
     onUnmounted(() => {
       if (debounceTimer.value) clearTimeout(debounceTimer.value);
     });
@@ -779,9 +907,16 @@ export default {
       formatFecha,
       formatEstado,
       getTipoEvento,
-      fetchEventos // <-- 7. Exponemos fetchEventos para el @change
+      fetchEventos,
+      // Retornos del Modal Ver
+      modalVerEventoRef,
+      eventoSeleccionado,
+      verEvento,
+      getNombrePersonal,
+      getBadgeClass,
+      personalNombres
     };
-    }
+  }
 }
 </script>
 

@@ -887,7 +887,8 @@ export default {
             break;
           case 'mes':
             inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-            fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+            // CORRECCIÓN AQUÍ TAMBIÉN:
+            fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
             break;
           case 'anio':
             inicio = new Date(hoy.getFullYear(), 0, 1);
